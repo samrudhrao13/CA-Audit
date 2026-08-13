@@ -1,0 +1,714 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --bg: #f3f4f8;
+  --surface: #ffffff;
+  --border: #d1d5db;
+  --border-card: #cbd5e1;
+  --border-soft: #e2e5ea;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-soft: #eef2ff;
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.05);
+  --shadow-md: 0 8px 20px -6px rgba(17, 24, 39, 0.12), 0 2px 6px rgba(17, 24, 39, 0.05);
+  --sidebar-width: 248px;
+  --topbar-height: 60px;
+  --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 32px;
+}
+
+.container-sm {
+  max-width: 400px;
+  margin: 64px auto;
+  padding: 40px 36px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Links that wrap a whole card (row/card navigation) read as neutral text,
+   not a link — only standalone inline links (table cells, breadcrumbs) get
+   the accent color below. */
+.card a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.row > .field {
+  flex: 1 1 180px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+input,
+select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+input[type="checkbox"] {
+  width: auto;
+  border: none;
+}
+
+.form-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.form-section h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.copy-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+.copy-field-value {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy-field-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+
+.copy-field-btn:hover {
+  color: var(--text);
+}
+
+.copy-field-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+}
+
+.copy-field-input::placeholder {
+  color: var(--text-muted);
+}
+
+.copy-field:focus-within {
+  border-color: var(--primary);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition), box-shadow var(--transition), transform 80ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: #d1d5db;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+thead {
+  background: #f8f9fc;
+}
+
+tbody tr {
+  transition: background var(--transition);
+}
+
+tbody tr:hover {
+  background: #fafbff;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.success-text {
+  color: var(--success);
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.list-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition),
+    transform 120ms ease;
+}
+
+.quick-link:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.quick-link:active {
+  transform: scale(0.96);
+}
+
+.file-drop-zone {
+  border: 2px dashed var(--border-card);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.file-drop-zone:hover {
+  border-color: var(--primary);
+}
+
+.file-drop-zone.dragging {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.file-drop-zone.disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.file-drop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-drop-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--bg);
+}
+
+.file-drop-remove-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.file-drop-remove-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.stat-card {
+  flex: 1 1 200px;
+  border-top: 3px solid var(--stat-color, var(--primary));
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+}
+
+/* ---------------------------------------------------------------------- */
+/* App shell: sidebar + topbar                                            */
+/* ---------------------------------------------------------------------- */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: #14152b;
+  color: #cbd0e6;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  transition: transform var(--transition);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: var(--topbar-height);
+}
+
+.sidebar-brand img {
+  height: 30px;
+  width: auto;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text strong {
+  display: block;
+  color: white;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.sidebar-brand-text span {
+  font-size: 11px;
+  color: #8b90b0;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: #b7bcda;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--transition), color var(--transition);
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: white;
+  text-decoration: none;
+}
+
+.sidebar-link.active {
+  background: var(--primary);
+  color: white;
+}
+
+.sidebar-link svg {
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: #8b90b0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-footer img {
+  height: 12px;
+}
+
+.sidebar-footer-link {
+  color: #b7bcda;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sidebar-footer-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.app-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: var(--topbar-height);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.topbar-account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 3px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+}
+
+.topbar-account-link:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.signout-btn {
+  transition: background var(--transition), color var(--transition), border-color var(--transition),
+    transform 120ms ease;
+}
+
+.signout-btn:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.signout-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.sidebar-toggle {
+  display: none;
+  background: none;
+  color: var(--text);
+  box-shadow: none;
+  padding: 6px;
+}
+
+.sidebar-toggle:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.page-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 32px;
+}
+
+.page-fade {
+  animation: fadeInUp 220ms ease both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Compliance banner — scrolling ticker, not a static strip                */
+/* ---------------------------------------------------------------------- */
+
+.compliance-banner {
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  display: flex;
+  align-items: stretch;
+}
+
+.compliance-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 14px;
+  background: #fde68a;
+  color: #92400e;
+}
+
+.compliance-banner-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.compliance-banner-track {
+  display: flex;
+  width: max-content;
+}
+
+/* Only applied when JS has measured that the content actually overflows
+   the viewport — otherwise a single copy just sits there, no animation,
+   no duplicate. See ComplianceBanner.jsx. */
+.compliance-banner-track.scrolling {
+  /* Starts shifted a full copy to the left and animates back to 0, so
+     content visibly travels left-to-right across the banner. */
+  transform: translateX(-50%);
+  animation-name: compliance-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.compliance-banner-track.scrolling:hover {
+  animation-play-state: paused;
+}
+
+.compliance-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 8px 24px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+@keyframes compliance-scroll {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-md);
+  }
+
+  .app-main {
+    margin-left: 0;
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 30;
+  }
+
+  .container {
+    padding: 20px 16px;
+  }
+}
