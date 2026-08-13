@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Defense in depth only. The Express backend uses the Firebase Admin SDK,
+// which bypasses these rules entirely — actual tenant isolation is enforced
+// in backend/src/middleware/profile.js (every request's orgId/role comes
+// from users/{uid}, looked up by the verified Firebase Auth uid). No client
+// code talks to Firestore directly; these rules exist only so that if a
+// Firebase client config is ever exposed, nothing useful is reachable.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /workflowDefinitions/{key} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
