@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { CredentialForm } from "../components/tds/CredentialForm";
 import { RunPanel } from "../components/tds/RunPanel";
+import { ProgressBar } from "../components/ProgressBar";
 
 export function TdsWorkspacePage() {
   const { clientId } = useParams();
@@ -10,18 +11,23 @@ export function TdsWorkspacePage() {
   const [hasCredential, setHasCredential] = useState(false);
   const [periods, setPeriods] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [progress, setProgress] = useState(null);
+  const [period, setPeriod] = useState(null);
 
   async function load() {
-    const [clientRes, credRes, periodsRes, runsRes] = await Promise.all([
+    const [clientRes, credRes, periodsRes, runsRes, progressRes] = await Promise.all([
       api.get(`/api/clients/${clientId}`),
       api.get(`/api/clients/${clientId}/tds/credentials/status`),
       api.get(`/api/clients/${clientId}/tds/periods`),
       api.get(`/api/clients/${clientId}/tds/runs`),
+      api.get(`/api/progress/client/${clientId}`),
     ]);
     setClient(clientRes);
     setHasCredential(credRes.hasCredential);
     setPeriods(periodsRes.periods);
     setRuns(runsRes.runs);
+    setProgress(progressRes.progress);
+    setPeriod(progressRes.period);
   }
 
   useEffect(() => {
@@ -35,11 +41,35 @@ export function TdsWorkspacePage() {
 
   if (!client) return <p>Loading...</p>;
 
+  const wfProgress = progress?.TDS;
+  const docSelection = client.documentChecklistConfig?.TDS;
+  const docCount = (docSelection?.predefinedSelected?.length || 0) + (docSelection?.otherDocuments?.length || 0);
+
   return (
     <div className="stack">
       <div>
         <h1>{client.name} — TDS</h1>
         <p className="muted">{client.tan ? `TAN: ${client.tan}` : "No TAN on file"}</p>
+      </div>
+
+      <div className="card">
+        <p style={{ marginTop: 0, fontWeight: 600 }}>Document checklist{period ? ` — ${period}` : ""}</p>
+        <ProgressBar
+          stage={wfProgress?.stage ?? "not_started"}
+          percent={wfProgress?.percent ?? 0}
+          documentsUploaded={wfProgress?.documentsUploaded ?? 0}
+          documentsTotal={wfProgress?.documentsTotal ?? (docCount || null)}
+        />
+        {docCount > 0 ? (
+          <Link to={`/clients/${clientId}/documents/TDS`} style={{ display: "inline-block", marginTop: 8 }}>
+            <button className="secondary">Open document checklist &rarr;</button>
+          </Link>
+        ) : (
+          <p className="muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
+            No documents selected for this client yet — a company admin can pick which ones apply
+            under Clients → this client → Edit client → "Document checklist."
+          </p>
+        )}
       </div>
 
       <CredentialForm clientId={clientId} hasCredential={hasCredential} onSaved={load} />
