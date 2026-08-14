@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { randomBytes } from "node:crypto";
 import { db } from "../lib/firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -241,6 +241,37 @@ function batchHeaderOrder(items) {
   return order;
 }
 
+// Light orange — flags a cell whose field came back marked "Check" (not confidently valid),
+// same status shown as an orange dot in the app. exceljs is the one writing this export (not
+// the "xlsx" package used elsewhere in the app) specifically because the free "xlsx" package
+// silently drops cell styling on write — confirmed it produces no <fills> at all in the output.
+const FLAG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE0B2" } };
+
+/** One row per extraction, one column per field, with any "Check"-status field's cell
+ *  highlighted. `rows` is `[{ values: {colName: value}, invalidCols: Set<colName> }]`. */
+async function buildExtractionWorkbook(headerOrder, rows, sheetName) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(sheetName);
+
+  sheet.addRow(headerOrder);
+  sheet.getRow(1).font = { bold: true };
+
+  for (const row of rows) {
+    const addedRow = sheet.addRow(headerOrder.map((col) => row.values[col] ?? ""));
+    headerOrder.forEach((col, i) => {
+      if (row.invalidCols.has(col)) {
+        addedRow.getCell(i + 1).fill = FLAG_FILL;
+      }
+    });
+  }
+
+  sheet.columns.forEach((col) => {
+    col.width = 18;
+  });
+
+  return workbook.xlsx.writeBuffer();
+}
+
 /**
  * General-purpose (not tied to any client) extraction + export — the
  * "common extractor" every company member can reach from the sidebar,
@@ -331,17 +362,17 @@ handscribeGeneralRouter.post(
       // One row per extraction, one column per field — matches how the user wants to
       // stack multiple extractions into a single running sheet, rather than one row
       // per field (which read as a fixed 5-column report, not tabular data).
-      const row = { "Source File": fileName || base };
+      const headerOrder = ["Source File", ...fields.map((f) => f.name)];
+      const values = { "Source File": fileName || base };
+      const invalidCols = new Set();
       for (const f of fields) {
-        row[f.name] = f.value;
+        values[f.name] = f.value;
+        if (!f.valid) invalidCols.add(f.name);
       }
-      const sheet = XLSX.utils.json_to_sheet([row]);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, sheet, "Extraction");
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await buildExtractionWorkbook(headerOrder, [{ values, invalidCols }], "Extraction");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${base}.xlsx"`);
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
 
     const xmlFields = fields
@@ -383,18 +414,18 @@ handscribeGeneralRouter.post(
     if (req.params.format === "xlsx") {
       const headerOrder = batchHeaderOrder(items);
       const rows = items.map((item) => {
-        const row = { "Source File": item.fileName };
-        for (const f of item.fields) row[f.name] = f.value;
-        for (const key of headerOrder) if (!(key in row)) row[key] = "";
-        return row;
+        const values = { "Source File": item.fileName };
+        const invalidCols = new Set();
+        for (const f of item.fields) {
+          values[f.name] = f.value;
+          if (!f.valid) invalidCols.add(f.name);
+        }
+        return { values, invalidCols };
       });
-      const sheet = XLSX.utils.json_to_sheet(rows, { header: headerOrder });
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, sheet, "Extractions");
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await buildExtractionWorkbook(headerOrder, rows, "Extractions");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${base}.xlsx"`);
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
 
     const extractionBlocks = items
