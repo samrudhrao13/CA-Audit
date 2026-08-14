@@ -14,6 +14,18 @@ export function stagePercent(stage) {
   return index === -1 ? 0 : Math.round(((index + 1) / PROGRESS_STAGES.length) * 100);
 }
 
+/** Prefers the real "how many of the required documents are actually in" fraction over the
+ *  coarse 4-stage bucket above, whenever a document count is available — otherwise the bar
+ *  and the "X of Y documents uploaded" label next to it can visibly disagree (e.g. a stage
+ *  advanced manually before a client had any documents configured shows 50% at 0 of 5). */
+function effectivePercent(stage, documentsUploaded, documentsTotal) {
+  if (stage === "filed") return 100;
+  if (documentsTotal) {
+    return Math.round(((documentsUploaded || 0) / documentsTotal) * 100);
+  }
+  return stagePercent(stage);
+}
+
 /** "YYYY-MM" for the current month, used as the default progress/email period. */
 export function currentPeriod() {
   const now = new Date();
@@ -58,7 +70,7 @@ export async function getClientProgress(orgId, clientId, period) {
     const data = doc.data();
     byWorkflow[data.workflowKey] = {
       stage: data.stage,
-      percent: stagePercent(data.stage),
+      percent: effectivePercent(data.stage, data.documentsUploaded, data.documentsTotal),
       filedOn: data.filedOn ?? null,
       documentsUploaded: data.documentsUploaded ?? null,
       documentsTotal: data.documentsTotal ?? null,
