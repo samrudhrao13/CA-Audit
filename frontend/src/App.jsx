@@ -20,6 +20,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsExtractorPage } from "./pages/SettingsExtractorPage";
 import { ExtractorPage } from "./pages/ExtractorPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { DocumentChecklistPage } from "./pages/DocumentChecklistPage";
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
         <Route path="/clients/:clientId/gst" element={<GstWorkspacePage />} />
         <Route path="/clients/:clientId/tds" element={<TdsWorkspacePage />} />
+        <Route path="/clients/:clientId/documents/:workflowKey" element={<DocumentChecklistPage />} />
         <Route
           path="/reports"
           element={
