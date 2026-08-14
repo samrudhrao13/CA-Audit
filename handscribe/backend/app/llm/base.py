@@ -59,6 +59,13 @@ class LLMStructuringProvider(ABC):
                     "then 1 checksum character, e.g. 27AAPFU0939F1ZV). Look for it near "
                     "labels like 'GST', 'GSTIN', or 'GST No'."
                 )
+            elif f.field_type.value == "date":
+                type_desc = (
+                    "date — normalize to DD/MM/YYYY (day/month/year) regardless of how "
+                    "it's written in the document, e.g. '15 March 2024', '3/15/2024', and "
+                    "'2024-03-15' must all be extracted as '15/03/2024'. Use the actual "
+                    "date found, just reformatted."
+                )
             field_lines.append(
                 f'- "{f.name}": type={type_desc}, required={f.required}'
             )
@@ -118,7 +125,10 @@ Rules:
 - Set "valid" to false if the extracted value does not actually match the
   declared type (e.g. a Numeric field containing letters, an Email field
   without an @, a Date field that isn't a date). Do not silently coerce or
-  reformat values to make them fit — flag the mismatch instead.
+  reformat values to make them fit — flag the mismatch instead. The one
+  exception is Date fields: always reformat the date you found to
+  DD/MM/YYYY as described above — that's a required normalization, not a
+  coercion of an invalid value.
 - For Custom Regex fields, "valid" should be true only if the value matches
   the given pattern.
 """

@@ -75,8 +75,16 @@ async function postDownload(path, body) {
 
 /** Uploads a single file as multipart/form-data — don't set Content-Type manually, the browser adds the boundary. */
 async function uploadFile(path, fieldName, file, fields = {}) {
+  return uploadFiles(path, { [fieldName]: file }, fields);
+}
+
+/** Like uploadFile, but for multiple files under different field names in one multipart request
+ *  (e.g. two Excel files being compared) — filesByField is {fieldName: File}. */
+async function uploadFiles(path, filesByField, fields = {}) {
   const formData = new FormData();
-  formData.append(fieldName, file);
+  for (const [fieldName, file] of Object.entries(filesByField)) {
+    formData.append(fieldName, file);
+  }
   for (const [key, value] of Object.entries(fields)) {
     formData.append(key, value);
   }
@@ -104,4 +112,5 @@ export const api = {
   download,
   postDownload,
   uploadFile,
+  uploadFiles,
 };

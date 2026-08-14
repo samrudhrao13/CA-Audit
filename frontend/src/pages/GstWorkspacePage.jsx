@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { CredentialForm } from "../components/gst/CredentialForm";
 import { RunPanel } from "../components/gst/RunPanel";
+import { Reconciliation } from "../components/gst/Reconciliation";
 import { ProgressBar } from "../components/ProgressBar";
 
 export function GstWorkspacePage() {
@@ -75,6 +76,8 @@ export function GstWorkspacePage() {
       <CredentialForm clientId={clientId} hasCredential={hasCredential} onSaved={load} />
 
       <RunPanel clientId={clientId} onRunFinished={load} />
+
+      <Reconciliation clientId={clientId} />
 
       <div>
         <h2>Return data by period</h2>

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
+import multer from "multer";
 import * as XLSX from "xlsx";
 import { db } from "../lib/firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -9,6 +10,12 @@ import { encryptSecret } from "../lib/crypto.js";
 import { startGstRun, submitOtp } from "../lib/runStore.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessWorkflow } from "../lib/clientAccess.js";
+import {
+  parseGstr2bWorkbook,
+  parseInvoiceExcel,
+  reconcile,
+  buildReconciliationExcelBuffer,
+} from "../lib/gstReconciliation.js";
 
 export const gstRouter = Router({ mergeParams: true });
 
@@ -225,5 +232,111 @@ gstRouter.get(
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
     res.send(buffer);
+  })
+);
+
+const MAX_RECONCILIATION_UPLOAD_BYTES = 15 * 1024 * 1024;
+const reconciliationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_RECONCILIATION_UPLOAD_BYTES } });
+
+function reconciliationUploadMiddleware(req, res, next) {
+  reconciliationUpload.fields([{ name: "invoiceFile", maxCount: 1 }, { name: "gstr2bFile", maxCount: 1 }])(req, res, (err) => {
+    if (err) {
+      const message = err.code === "LIMIT_FILE_SIZE" ? "Each file must be under 15MB" : "Upload failed";
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}
+
+function reconciliationRef(orgId, clientId, period) {
+  return clientRef(orgId, clientId).collection("gstReconciliations").doc(period);
+}
+
+/**
+ * Compares an uploaded Invoice Excel (the client's purchase invoices for `period`) against an
+ * uploaded GSTR-2B (B2B sheet) for the same period — see backend/src/lib/gstReconciliation.js.
+ * Persists the result so it can be revisited without re-uploading, then returns it.
+ */
+gstRouter.post(
+  "/reconciliation",
+  reconciliationUploadMiddleware,
+  asyncHandler(async (req, res) => {
+    const client = await loadGstClient(req, res);
+    if (!client) return;
+
+    const period = String(req.body.period || "");
+    if (!/^\d{4}-\d{2}$/.test(period)) {
+      return res.status(400).json({ error: "period is required (YYYY-MM)" });
+    }
+    const invoiceFile = req.files?.invoiceFile?.[0];
+    const gstr2bFile = req.files?.gstr2bFile?.[0];
+    if (!invoiceFile) {
+      return res.status(400).json({ error: "Upload the client's Invoice Excel" });
+    }
+    if (!gstr2bFile) {
+      return res.status(400).json({ error: "Upload the GSTR-2B Excel file" });
+    }
+
+    let gstr2bRows, clientRows, outsidePeriod, unparseableDate;
+    try {
+      gstr2bRows = parseGstr2bWorkbook(gstr2bFile.buffer);
+      ({ rows: clientRows, outsidePeriod, unparseableDate } = parseInvoiceExcel(invoiceFile.buffer, period));
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    const result = reconcile(gstr2bRows, clientRows);
+
+    const record = {
+      period,
+      gstr2bFileName: gstr2bFile.originalname,
+      invoiceFileName: invoiceFile.originalname,
+      gstr2bRowCount: gstr2bRows.length,
+      clientRowCount: clientRows.length,
+      skippedInvoiceRows: { outsidePeriod, unparseableDate },
+      matched: result.matched,
+      mismatched: result.mismatched,
+      clientOnly: result.clientOnly,
+      gstr2bOnly: result.gstr2bOnly,
+      amountToPay: result.amountToPay,
+      uploadedAt: new Date().toISOString(),
+      uploadedByUid: req.uid,
+    };
+    await reconciliationRef(req.orgId, req.params.clientId, period).set(record);
+
+    res.json(record);
+  })
+);
+
+gstRouter.get(
+  "/reconciliation/:period",
+  asyncHandler(async (req, res) => {
+    const client = await loadGstClient(req, res);
+    if (!client) return;
+
+    const snap = await reconciliationRef(req.orgId, req.params.clientId, req.params.period).get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "No reconciliation run for this period yet" });
+    }
+    res.json(snap.data());
+  })
+);
+
+gstRouter.get(
+  "/reconciliation/:period/export",
+  asyncHandler(async (req, res) => {
+    const client = await loadGstClient(req, res);
+    if (!client) return;
+
+    const snap = await reconciliationRef(req.orgId, req.params.clientId, req.params.period).get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "No reconciliation run for this period yet" });
+    }
+
+    const buffer = await buildReconciliationExcelBuffer(snap.data(), { clientName: client.name, period: req.params.period });
+    const filenameBase = `${client.name.replace(/[^a-z0-9]+/gi, "_")}_GSTR2B_Reconciliation_${req.params.period}`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
+    res.send(Buffer.from(buffer));
   })
 );
