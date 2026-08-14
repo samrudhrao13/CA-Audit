@@ -2,10 +2,35 @@ import { INDIAN_STATES } from "../lib/indianStates";
 import { COMPANY_TYPES } from "../lib/companyTypes";
 import { TdsCodePicker } from "./TdsCodePicker";
 import { CustomFieldsEditor } from "./CustomFieldsEditor";
+import { StringListEditor } from "./StringListEditor";
 import { SAC_CODES, describeSacCode } from "../lib/sacCodes";
 
-/** Company/registration/address/contact/TDS fields shared by the create-client form and the edit-client form. */
-export function ClientFormFields({ form, setField, setFormValue }) {
+/** Company/registration/address/contact/TDS fields shared by the create-client form and the
+ *  edit-client form. `subscriptions` (from GET /api/workflows/subscriptions) drives the
+ *  document-checklist section below — each active workflow's own default document list, for
+ *  picking which apply to this specific client. */
+export function ClientFormFields({ form, setField, setFormValue, subscriptions = [] }) {
+  const activeWorkflows = subscriptions.filter((s) => s.status === "active");
+
+  function toggleDocument(workflowKey, docName) {
+    const current = form.documentChecklistConfig?.[workflowKey] || { predefinedSelected: [], otherDocuments: [] };
+    const predefinedSelected = current.predefinedSelected.includes(docName)
+      ? current.predefinedSelected.filter((d) => d !== docName)
+      : [...current.predefinedSelected, docName];
+    setFormValue("documentChecklistConfig", {
+      ...form.documentChecklistConfig,
+      [workflowKey]: { ...current, predefinedSelected },
+    });
+  }
+
+  function setOtherDocuments(workflowKey, otherDocuments) {
+    const current = form.documentChecklistConfig?.[workflowKey] || { predefinedSelected: [], otherDocuments: [] };
+    setFormValue("documentChecklistConfig", {
+      ...form.documentChecklistConfig,
+      [workflowKey]: { ...current, otherDocuments },
+    });
+  }
+
   return (
     <>
       <div className="form-section">
@@ -205,6 +230,58 @@ export function ClientFormFields({ form, setField, setFormValue }) {
           onChange={(entries) => setFormValue("customFields", entries)}
         />
       </div>
+
+      {activeWorkflows.length > 0 && (
+        <div className="form-section">
+          <h3>Document checklist</h3>
+          <p className="muted" style={{ margin: "0 0 4px" }}>
+            Tick which of your firm's standard documents this client needs to provide, per
+            workflow — not every client needs every document. Add anything specific to just
+            this client under "Other documents."
+          </p>
+          <div className="stack" style={{ gap: 18 }}>
+            {activeWorkflows.map((wf) => {
+              const selection = form.documentChecklistConfig?.[wf.workflowKey] || {
+                predefinedSelected: [],
+                otherDocuments: [],
+              };
+              return (
+                <div key={wf.workflowKey}>
+                  <p style={{ margin: "0 0 6px", fontWeight: 600 }}>{wf.name}</p>
+
+                  {wf.documentDefaults.length === 0 ? (
+                    <p className="muted" style={{ margin: "0 0 8px", fontSize: 13 }}>
+                      No default checklist set for this workflow yet — add one under Settings → Workflows.
+                    </p>
+                  ) : (
+                    <div className="stack" style={{ gap: 6, marginBottom: 10 }}>
+                      {wf.documentDefaults.map((doc) => (
+                        <label key={doc} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+                          <input
+                            type="checkbox"
+                            checked={selection.predefinedSelected.includes(doc)}
+                            onChange={() => toggleDocument(wf.workflowKey, doc)}
+                          />
+                          {doc}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="muted" style={{ margin: "0 0 4px", fontSize: 13 }}>
+                    Other documents (specific to this client)
+                  </p>
+                  <StringListEditor
+                    items={selection.otherDocuments}
+                    onChange={(items) => setOtherDocuments(wf.workflowKey, items)}
+                    placeholder="e.g. Rent agreement copy"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -59,11 +59,59 @@ workflowsRouter.get(
         workflowKey: d.id,
         status: data.status,
         subscribedAt: data.subscribedAt,
+        name: catalogByKey[d.id]?.name || d.id,
         timeline: effectiveTimeline(catalogByKey[d.id], data),
+        // documentDefaults is this company's own required-documents checklist for the
+        // workflow, editable below — starts from the platform catalog's list until the
+        // company customizes it, same fallback pattern as the timeline override above.
+        documentDefaults: data.documentDefaults ?? catalogByKey[d.id]?.requiredDocuments ?? [],
+        documentDefaultsOverridden: Array.isArray(data.documentDefaults),
       };
     });
 
     res.json({ subscriptions });
+  })
+);
+
+const documentDefaultsSchema = z.object({
+  documents: z.array(z.string()).max(50).optional().default([]),
+  reset: z.boolean().optional().default(false),
+});
+
+/**
+ * Company admin sets their own firm's default required-documents checklist for a workflow —
+ * the starting point every client's individual document selection (see routes/clients.js's
+ * documentChecklistConfig) is checked off from. { reset: true } clears the override and falls
+ * back to the platform catalog's list again, mirroring the timeline override above.
+ */
+workflowsRouter.put(
+  "/subscriptions/:workflowKey/document-defaults",
+  requireCompanyMember,
+  requireRole("COMPANY_ADMIN"),
+  asyncHandler(async (req, res) => {
+    const parsed = documentDefaultsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid input" });
+    }
+
+    const subRef = db
+      .collection("organizations")
+      .doc(req.orgId)
+      .collection("workflowSubscriptions")
+      .doc(req.params.workflowKey);
+    const subSnap = await subRef.get();
+    if (!subSnap.exists) {
+      return res.status(404).json({ error: "Not subscribed to this workflow" });
+    }
+
+    if (parsed.data.reset) {
+      await subRef.update({ documentDefaults: null });
+      return res.json({ ok: true });
+    }
+
+    const documents = parsed.data.documents.map((s) => s.trim()).filter(Boolean);
+    await subRef.update({ documentDefaults: documents });
+    res.json({ ok: true });
   })
 );
 

@@ -32,6 +32,7 @@ const EMPTY_FORM = {
   contactPersonEmail: "",
   tdsApplicability: [],
   customFields: [],
+  documentChecklistConfig: {},
   notifyCompanyEmail: false,
   notifyContactPersonEmail: true,
 };
@@ -61,6 +62,7 @@ export function ClientsPage() {
   const isAdmin = profile?.role === "COMPANY_ADMIN";
   const [clients, setClients] = useState(null);
   const [timelineByKey, setTimelineByKey] = useState({});
+  const [subscriptions, setSubscriptions] = useState([]);
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [creating, setCreating] = useState(false);
@@ -81,6 +83,7 @@ export function ClientsPage() {
     ]);
     setClients(clients);
     setTimelineByKey(Object.fromEntries(subscriptions.map((s) => [s.workflowKey, s.timeline])));
+    setSubscriptions(subscriptions);
     setMembers(members);
   }
 
@@ -186,7 +189,7 @@ export function ClientsPage() {
 
       {isAdmin && showCreateForm && (
       <form onSubmit={handleCreate} className="card stack" style={{ gap: 20 }}>
-        <ClientFormFields form={form} setField={setField} setFormValue={setFormValue} />
+        <ClientFormFields form={form} setField={setField} setFormValue={setFormValue} subscriptions={subscriptions} />
 
         <div className="form-section">
           <h3>Document-request emails go to</h3>

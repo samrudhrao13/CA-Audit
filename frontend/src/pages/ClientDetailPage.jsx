@@ -179,6 +179,7 @@ export function ClientDetailPage() {
       contactPersonEmail: client.contactPersonEmail || "",
       tdsApplicability: client.tdsApplicability || [],
       customFields: client.customFields || [],
+      documentChecklistConfig: client.documentChecklistConfig || {},
     });
     setEditError(null);
     setEditing(true);
@@ -255,7 +256,12 @@ export function ClientDetailPage() {
 
         {editing ? (
           <form onSubmit={saveEdit} className="card stack" style={{ gap: 20 }}>
-            <ClientFormFields form={editForm} setField={setEditField} setFormValue={setEditFormValue} />
+            <ClientFormFields
+              form={editForm}
+              setField={setEditField}
+              setFormValue={setEditFormValue}
+              subscriptions={subscriptions}
+            />
             {editError && <p className="error-text">{editError}</p>}
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" disabled={savingEdit}>
@@ -350,6 +356,35 @@ export function ClientDetailPage() {
                   {client.customFields.map((f, i) => (
                     <CopyField key={i} label={f.name} value={f.value} />
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="form-section">
+              <h3>Document checklist</h3>
+              {Object.entries(client.documentChecklistConfig || {}).filter(
+                ([, sel]) => (sel.predefinedSelected?.length || 0) + (sel.otherDocuments?.length || 0) > 0
+              ).length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>No documents selected yet.</p>
+              ) : (
+                <div className="stack" style={{ gap: 10 }}>
+                  {Object.entries(client.documentChecklistConfig || {}).map(([workflowKey, sel]) => {
+                    const docs = [...(sel.predefinedSelected || []), ...(sel.otherDocuments || [])];
+                    if (docs.length === 0) return null;
+                    const workflowName = subscriptions.find((s) => s.workflowKey === workflowKey)?.name || workflowKey;
+                    return (
+                      <div key={workflowKey}>
+                        <p className="muted" style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600 }}>
+                          {workflowName}
+                        </p>
+                        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                          {docs.map((d) => (
+                            <li key={d}>{d}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

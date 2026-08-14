@@ -14,14 +14,13 @@ export const documentsRouter = Router();
 documentsRouter.use(requireAuth, requireCompanyMember);
 
 /**
- * Generic across every workflow (not TDS-specific) — any workflow with a
- * requiredDocuments list in its catalog entry gets this checklist for free.
+ * Generic across every workflow (not TDS-specific) — driven by each client's own resolved
+ * document checklist for that workflow (see loadClientAndCatalog below), not a fixed
+ * platform-wide list, since which documents a client actually needs varies client to client.
  *
- * TEMPORARY BRIDGE: files live directly in Firestore as base64, one document
- * per file so no single doc gets close to the 1MiB limit. 500KB per file
- * keeps real headroom. This is standing in until Google Drive is connected —
- * the swap point is saveFile/loadFile below; nothing else in this file (or
- * the frontend) needs to change once that happens.
+ * Files live directly in Firestore as base64 (one document per file so no single doc gets
+ * close to the 1MiB limit; 500KB per file keeps real headroom) and are also best-effort
+ * mirrored into Drive — see uploadCompanyDocumentToDrive below.
  */
 const MAX_DOCUMENT_BYTES = 500 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_DOCUMENT_BYTES } });
@@ -57,13 +56,18 @@ async function loadClientAndCatalog(req, res, workflowKey) {
     res.status(404).json({ error: "Client not found or workflow not enabled" });
     return null;
   }
-  if (!canAccessWorkflow(req, clientSnap.data(), workflowKey)) {
+  const client = clientSnap.data();
+  if (!canAccessWorkflow(req, client, workflowKey)) {
     res.status(403).json({ error: "This workflow isn't assigned to you for this client" });
     return null;
   }
-  const catalogSnap = await db.collection("workflowDefinitions").doc(workflowKey).get();
-  const requiredDocuments = catalogSnap.data()?.requiredDocuments || [];
-  return { client: { id: clientSnap.id, ...clientSnap.data() }, requiredDocuments };
+  // This client's own resolved checklist (predefined documents the admin checked off for
+  // them + any "other" documents unique to them) — set on the client profile, see
+  // routes/clients.js's documentChecklistConfig. No longer the platform-wide catalog list,
+  // since not every client needs every document.
+  const selection = client.documentChecklistConfig?.[workflowKey];
+  const requiredDocuments = [...(selection?.predefinedSelected || []), ...(selection?.otherDocuments || [])];
+  return { client: { id: clientSnap.id, ...client }, requiredDocuments };
 }
 
 /** Merges the workflow's required-documents catalog with this client+period's upload status. */

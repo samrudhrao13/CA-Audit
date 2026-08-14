@@ -111,6 +111,16 @@ const customFieldSchema = z.object({
   value: z.string().trim().max(500).optional().default(""),
 });
 
+// Per-workflow document checklist for one client: which of the company's predefined
+// documents (see workflows.js's documentDefaults) apply to this client, plus any extra
+// documents unique to just this client that aren't in the predefined list at all. The
+// resolved list (predefinedSelected + otherDocuments) is what actually drives that client's
+// document-request emails and upload checklist — see routes/documents.js.
+const documentSelectionSchema = z.object({
+  predefinedSelected: z.array(z.string()).max(50).optional().default([]),
+  otherDocuments: z.array(z.string()).max(50).optional().default([]),
+});
+
 // Shared by create and edit — the client-profile fields themselves. Create
 // additionally asks for the document-request email recipients (see below);
 // edit leaves those alone (they have their own dedicated save action).
@@ -137,7 +147,21 @@ const clientProfileFields = {
   natureOfBusiness: z.string().trim().optional().default(""),
   tdsApplicability: z.array(tdsCodeEntrySchema).max(20).optional().default([]),
   customFields: z.array(customFieldSchema).max(30).optional().default([]),
+  documentChecklistConfig: z.record(z.string(), documentSelectionSchema).optional().default({}),
 };
+
+/** Trims/drops blank entries so an accidental empty "Add" row never blocks saving, and
+ *  normalizes the map into a plain object safe to store on the client doc. */
+function normalizeDocumentChecklistConfig(config) {
+  const normalized = {};
+  for (const [workflowKey, selection] of Object.entries(config || {})) {
+    normalized[workflowKey] = {
+      predefinedSelected: (selection.predefinedSelected || []).map((s) => s.trim()).filter(Boolean),
+      otherDocuments: (selection.otherDocuments || []).map((s) => s.trim()).filter(Boolean),
+    };
+  }
+  return normalized;
+}
 
 function clientProfileData(parsedData) {
   return {
@@ -158,6 +182,7 @@ function clientProfileData(parsedData) {
     email: parsedData.email || null,
     tdsApplicability: parsedData.tdsApplicability || [],
     customFields: parsedData.customFields || [],
+    documentChecklistConfig: normalizeDocumentChecklistConfig(parsedData.documentChecklistConfig),
     contactPersonName: parsedData.contactPersonName || null,
     contactPersonPhone: parsedData.contactPersonPhone || null,
     contactPersonEmail: parsedData.contactPersonEmail,

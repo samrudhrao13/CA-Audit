@@ -3,11 +3,11 @@ import { db } from "./firebaseAdmin.js";
 import { sendMail } from "./mailer.js";
 import { currentPeriod, setProgressStage } from "./workflowProgress.js";
 
-async function loadWorkflowCatalog() {
+async function loadWorkflowNames() {
   const snap = await db.collection("workflowDefinitions").get();
   const byKey = {};
   for (const doc of snap.docs) {
-    byKey[doc.id] = { name: doc.data().name, requiredDocuments: doc.data().requiredDocuments || [] };
+    byKey[doc.id] = doc.data().name;
   }
   return byKey;
 }
@@ -41,7 +41,7 @@ export async function runDocumentRequestForOrg(orgId, period = currentPeriod()) 
     return { sent: 0 };
   }
 
-  const catalog = await loadWorkflowCatalog();
+  const names = await loadWorkflowNames();
   const clientsSnap = await db.collection("organizations").doc(orgId).collection("clients").get();
 
   let sent = 0;
@@ -58,11 +58,16 @@ export async function runDocumentRequestForOrg(orgId, period = currentPeriod()) 
 
     if (enrolled.length === 0 || recipients.length === 0) continue;
 
-    const workflowDocs = enrolled.map((key) => ({
-      workflowKey: key,
-      workflowName: catalog[key]?.name || key,
-      documents: catalog[key]?.requiredDocuments || [],
-    }));
+    // Each client's own resolved checklist — see routes/clients.js's documentChecklistConfig
+    // — not a fixed list shared by every client on this workflow.
+    const workflowDocs = enrolled.map((key) => {
+      const selection = client.documentChecklistConfig?.[key];
+      return {
+        workflowKey: key,
+        workflowName: names[key] || key,
+        documents: [...(selection?.predefinedSelected || []), ...(selection?.otherDocuments || [])],
+      };
+    });
 
     await sendMail({
       to: recipients,
