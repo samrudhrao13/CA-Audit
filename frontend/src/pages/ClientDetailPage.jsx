@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { ProgressBar } from "../components/ProgressBar";
-import { DocumentChecklist } from "../components/DocumentChecklist";
 import { useUserProfile } from "../context/UserProfileContext";
 import { PROGRESS_STAGES, nextStage } from "../lib/progressStages";
 import { CopyField } from "../components/CopyField";
@@ -491,6 +490,12 @@ export function ClientDetailPage() {
             const enrolled = enrolledKeys.has(wf.key);
             const subscribed = subscribedKeys.has(wf.key);
             const wfProgress = progress[wf.key];
+            // This client's own selected documents for this workflow (see the "Document
+            // checklist" section above) — not the admin's company-wide default list, since
+            // not every default is applicable to every client.
+            const clientDocSelection = client.documentChecklistConfig?.[wf.key];
+            const clientDocCount =
+              (clientDocSelection?.predefinedSelected?.length || 0) + (clientDocSelection?.otherDocuments?.length || 0);
 
             return (
               <li key={wf.key} className="card">
@@ -524,19 +529,12 @@ export function ClientDetailPage() {
                       stage={wfProgress?.stage ?? "not_started"}
                       percent={wfProgress?.percent ?? 0}
                       documentsUploaded={wfProgress?.documentsUploaded ?? 0}
-                      documentsTotal={wfProgress?.documentsTotal ?? (wf.requiredDocuments?.length || null)}
+                      documentsTotal={wfProgress?.documentsTotal ?? (clientDocCount || null)}
                     />
-                    {wf.requiredDocuments?.length > 0 ? (
-                      <DocumentChecklist
-                        clientId={client.id}
-                        workflowKey={wf.key}
-                        workflowName={wf.name}
-                        period={period}
-                        progressStage={wfProgress?.stage}
-                        filedOn={wfProgress?.filedOn}
-                        onChanged={load}
-                        readOnly={isAdmin}
-                      />
+                    {clientDocCount > 0 ? (
+                      <Link to={`/clients/${client.id}/documents/${wf.key}`} style={{ display: "inline-block", marginTop: 8 }}>
+                        <button className="secondary">Open document checklist &rarr;</button>
+                      </Link>
                     ) : (
                       (wfProgress?.stage ?? null) !== "filed" &&
                       (isAdmin ? (
