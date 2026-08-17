@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useUserProfile } from "../context/UserProfileContext";
 import { HandscribeLogo } from "../components/HandscribeLogo";
-import { ExtractionResults } from "../components/ExtractionResults";
+import { ExtractionGrid } from "../components/ExtractionGrid";
 import { FileDropZone } from "../components/FileDropZone";
 import { DriveFilePicker } from "../components/DriveFilePicker";
 import { applyDateFormat } from "../lib/normalizeDate";
 
-const MAX_FILES = 10;
+const MAX_FILES = 50;
 
 /** General-purpose extractor, not tied to any client — available to every company member.
  *  For extraction saved against a specific client's history, use the "Extract documents"
@@ -107,8 +107,12 @@ export function ExtractorPage() {
     setExtracting(false);
   }
 
-  function updateResultFields(index, newFields) {
-    setResults((prev) => prev.map((r, i) => (i === index ? { ...r, fields: newFields } : r)));
+  function updateResultField(rowIndex, fieldIndex, value) {
+    setResults((prev) =>
+      prev.map((r, i) =>
+        i === rowIndex ? { ...r, fields: r.fields.map((f, fi) => (fi === fieldIndex ? { ...f, value } : f)) } : r
+      )
+    );
   }
 
   async function handleBatchExport(format) {
@@ -247,33 +251,25 @@ export function ExtractorPage() {
         </button>
       </form>
 
-      {results.length > 1 && (
-        <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>{results.length} extractions ready — export together as one sheet</p>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {batchExportError && <span className="error-text">{batchExportError}</span>}
-            <button type="button" className="secondary" disabled={batchExporting === "xlsx"} onClick={() => handleBatchExport("xlsx")}>
-              {batchExporting === "xlsx" ? "Exporting..." : "Export all — Excel"}
-            </button>
-            <button type="button" className="secondary" disabled={batchExporting === "xml"} onClick={() => handleBatchExport("xml")}>
-              {batchExporting === "xml" ? "Exporting..." : "Export all — XML"}
-            </button>
+      {results.length > 0 && (
+        <div className="card stack" style={{ gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              {results.length} extraction{results.length === 1 ? "" : "s"} — edit any cell before exporting
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {batchExportError && <span className="error-text">{batchExportError}</span>}
+              <button type="button" className="secondary" disabled={batchExporting === "xlsx"} onClick={() => handleBatchExport("xlsx")}>
+                {batchExporting === "xlsx" ? "Exporting..." : "Export Excel"}
+              </button>
+              <button type="button" className="secondary" disabled={batchExporting === "xml"} onClick={() => handleBatchExport("xml")}>
+                {batchExporting === "xml" ? "Exporting..." : "Export XML"}
+              </button>
+            </div>
           </div>
+          <ExtractionGrid results={results} onFieldChange={updateResultField} />
         </div>
       )}
-
-      {results.map((r, i) => (
-        <div className="card" key={`${r.fileName}-${i}`}>
-          <p className="muted" style={{ margin: "0 0 10px", fontSize: 13 }}>
-            {r.fileName}
-          </p>
-          <ExtractionResults
-            fields={r.fields}
-            onFieldsChange={(newFields) => updateResultFields(i, newFields)}
-            fileNameHint={r.templateName || r.fileName}
-          />
-        </div>
-      ))}
     </div>
   );
 }

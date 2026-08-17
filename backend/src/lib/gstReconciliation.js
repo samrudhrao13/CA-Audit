@@ -121,6 +121,12 @@ export function parseGstr2bWorkbook(buffer) {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames.find((name) => name.trim().toLowerCase() === "b2b");
   if (!sheetName) {
+    if (workbook.SheetNames.some((name) => name.trim().toLowerCase() === "extractions")) {
+      throw new Error(
+        "This looks like your extracted-invoices export (it has an \"Extractions\" sheet), not a GSTR-2B file. " +
+          "Upload the real GSTR-2B file (downloaded from the GST portal) here, and your extracted invoices in the Invoice Excel field instead."
+      );
+    }
     throw new Error(`Couldn't find a "B2B" sheet in this file. Sheets found: ${workbook.SheetNames.join(", ")}`);
   }
 

@@ -11,6 +11,7 @@ export const FIELD_TYPES = [
   { value: "email", label: "Email" },
   { value: "phone", label: "Phone" },
   { value: "gst_number", label: "GST Number" },
+  { value: "pan_number", label: "PAN Number" },
   { value: "custom_regex", label: "Custom Regex" },
 ];
 

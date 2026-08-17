@@ -59,6 +59,15 @@ class LLMStructuringProvider(ABC):
                     "then 1 checksum character, e.g. 27AAPFU0939F1ZV). Look for it near "
                     "labels like 'GST', 'GSTIN', or 'GST No'."
                 )
+            elif f.field_type.value == "pan_number":
+                type_desc = (
+                    "pan_number (Indian PAN: exactly 10 characters — 5 letters, 4 digits, "
+                    "1 letter, e.g. AAPFU0939F). Look for it near labels like 'PAN', "
+                    "'PAN No', or 'PAN Card'. A GSTIN contains a PAN as characters 3-12 of "
+                    "itself — don't extract that substring as the PAN unless the document "
+                    "also independently shows a standalone PAN, since a GSTIN and a PAN are "
+                    "different identifiers."
+                )
             elif f.field_type.value == "date":
                 type_desc = (
                     "date — normalize to DD/MM/YYYY (day/month/year) regardless of how "

@@ -10,6 +10,7 @@ import { describeTdsCode } from "../lib/tdsCodes";
 import { describeSacCode } from "../lib/sacCodes";
 import { BulkInvoiceUpload } from "../components/BulkInvoiceUpload";
 import { CompanyDocumentsUpload } from "../components/CompanyDocumentsUpload";
+import { HandscribeExtract } from "../components/HandscribeExtract";
 
 // Workflows with their own dedicated workspace page (credentials + fetch + export).
 // Anything not listed here just shows "Enabled" once the client is enrolled.
@@ -620,6 +621,8 @@ export function ClientDetailPage() {
           })}
         </ul>
       </div>
+
+      <HandscribeExtract clientId={client.id} isAdmin={isAdmin} />
 
       <BulkInvoiceUpload clientId={client.id} />
 

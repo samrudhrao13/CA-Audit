@@ -15,6 +15,9 @@ from app.schemas import FieldType
 # 'Z' (fixed) + 1 alphanumeric checksum. Standard 15-character format.
 GST_NUMBER_PATTERN = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$")
 
+# PAN: 5 letters + 4 digits + 1 letter. Standard 10-character format.
+PAN_NUMBER_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$")
+
 NUMERIC_PATTERN = re.compile(r"^\d+(\.\d+)?$")
 ALPHABETIC_PATTERN = re.compile(r"^[A-Za-z\s.'-]+$")
 ALPHANUMERIC_PATTERN = re.compile(r"^[A-Za-z0-9\s.,#/-]+$")
@@ -45,6 +48,8 @@ def is_valid_for_type(field_type: FieldType, value: str, regex_pattern: str | No
 
     if field_type == FieldType.GST_NUMBER:
         return GST_NUMBER_PATTERN.fullmatch(value.upper()) is not None
+    if field_type == FieldType.PAN_NUMBER:
+        return PAN_NUMBER_PATTERN.fullmatch(value.upper()) is not None
     if field_type == FieldType.NUMERIC:
         return NUMERIC_PATTERN.fullmatch(value) is not None
     if field_type == FieldType.ALPHABETIC:

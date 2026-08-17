@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { HandscribeLogo } from "./HandscribeLogo";
-import { ExtractionResults } from "./ExtractionResults";
+import { ExtractionGrid } from "./ExtractionGrid";
 import { FileDropZone } from "./FileDropZone";
 import { DriveFilePicker } from "./DriveFilePicker";
 import { applyDateFormat } from "../lib/normalizeDate";
 
-const MAX_FILES = 10;
+const MAX_FILES = 50;
 
 /** Client-wise document extraction via HandScribe (OCR + LLM structuring) — see handscribe/README.md.
  *  Templates are maintained by the company admin under Settings → Extractor; this component only
@@ -99,8 +99,12 @@ export function HandscribeExtract({ clientId, isAdmin }) {
     setExtracting(false);
   }
 
-  function updateResultFields(index, newFields) {
-    setResults((prev) => prev.map((r, i) => (i === index ? { ...r, fields: newFields } : r)));
+  function updateResultField(rowIndex, fieldIndex, value) {
+    setResults((prev) =>
+      prev.map((r, i) =>
+        i === rowIndex ? { ...r, fields: r.fields.map((f, fi) => (fi === fieldIndex ? { ...f, value } : f)) } : r
+      )
+    );
   }
 
   async function handleBatchExport(format) {
@@ -219,33 +223,25 @@ export function HandscribeExtract({ clientId, isAdmin }) {
         </button>
       </form>
 
-      {results.length > 1 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, paddingTop: 10, borderTop: "1px solid #e2e8f0" }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>{results.length} extractions ready — export together as one sheet</p>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {batchExportError && <span className="error-text">{batchExportError}</span>}
-            <button type="button" className="secondary" disabled={batchExporting === "xlsx"} onClick={() => handleBatchExport("xlsx")}>
-              {batchExporting === "xlsx" ? "Exporting..." : "Export all — Excel"}
-            </button>
-            <button type="button" className="secondary" disabled={batchExporting === "xml"} onClick={() => handleBatchExport("xml")}>
-              {batchExporting === "xml" ? "Exporting..." : "Export all — XML"}
-            </button>
+      {results.length > 0 && (
+        <div className="stack" style={{ gap: 10, paddingTop: 10, borderTop: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              {results.length} extraction{results.length === 1 ? "" : "s"} — edit any cell before exporting
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {batchExportError && <span className="error-text">{batchExportError}</span>}
+              <button type="button" className="secondary" disabled={batchExporting === "xlsx"} onClick={() => handleBatchExport("xlsx")}>
+                {batchExporting === "xlsx" ? "Exporting..." : "Export Excel"}
+              </button>
+              <button type="button" className="secondary" disabled={batchExporting === "xml"} onClick={() => handleBatchExport("xml")}>
+                {batchExporting === "xml" ? "Exporting..." : "Export XML"}
+              </button>
+            </div>
           </div>
+          <ExtractionGrid results={results} onFieldChange={updateResultField} />
         </div>
       )}
-
-      {results.map((r, i) => (
-        <div key={`${r.fileName}-${i}`} style={{ paddingTop: 10, borderTop: "1px solid #e2e8f0" }}>
-          <p className="muted" style={{ margin: "0 0 10px", fontSize: 13 }}>
-            {r.fileName}
-          </p>
-          <ExtractionResults
-            fields={r.fields}
-            onFieldsChange={(newFields) => updateResultFields(i, newFields)}
-            fileNameHint={`${r.templateName || "extraction"}_${clientId}`}
-          />
-        </div>
-      ))}
 
       {history && history.length > 0 && (
         <div className="stack" style={{ gap: 8, paddingTop: 10, borderTop: "1px solid #e2e8f0" }}>

@@ -10,6 +10,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessClient } from "../lib/clientAccess.js";
 import { uploadInvoiceToDrive, downloadDriveFile } from "../lib/googleDrive.js";
 import { applyDateFormat } from "../lib/dateUtils.js";
+import { applyClientIdentityOverride } from "../lib/clientIdentityOverride.js";
 
 const HANDSCRIBE_BASE_URL = process.env.HANDSCRIBE_BASE_URL || "http://localhost:8000";
 
@@ -214,7 +215,7 @@ handscribeGeneralRouter.post(
       return res.status(400).json({ error: "Provide a templateId or fieldsJson describing the fields to extract" });
     }
 
-    let fileBuffer, fileName, fileMimeType;
+    let fileBuffer, fileName, fileMimeType, clientData;
     if (req.file) {
       fileBuffer = req.file.buffer;
       fileName = req.file.originalname;
@@ -235,6 +236,7 @@ handscribeGeneralRouter.post(
       if (!clientSnap.exists || !canAccessClient(req, clientSnap.data())) {
         return res.status(403).json({ error: "This client isn't assigned to you" });
       }
+      clientData = clientSnap.data();
 
       try {
         const driveSource = await downloadDriveFile(req.body.driveFileId);
@@ -257,7 +259,8 @@ handscribeGeneralRouter.post(
     const result = await callHandscribe("POST", "/api/extract", { formData });
     if (!result.ok) return res.status(result.status).json({ error: result.message });
 
-    res.json(result.data);
+    const data = clientData ? { ...result.data, fields: applyClientIdentityOverride(result.data.fields, clientData) } : result.data;
+    res.json(data);
   })
 );
 
@@ -444,6 +447,7 @@ handscribeRouter.post(
     if (!result.ok) return res.status(result.status).json({ error: result.message });
 
     const extraction = result.data;
+    extraction.fields = applyClientIdentityOverride(extraction.fields, client);
     const extractionId = randomBytes(12).toString("hex");
     const canStoreFile = fileBuffer.length <= MAX_STORED_FILE_BYTES;
 

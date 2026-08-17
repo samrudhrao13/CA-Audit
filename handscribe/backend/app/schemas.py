@@ -15,6 +15,7 @@ class FieldType(str, Enum):
     EMAIL = "email"
     PHONE = "phone"
     GST_NUMBER = "gst_number"
+    PAN_NUMBER = "pan_number"
     CUSTOM_REGEX = "custom_regex"
 
 
