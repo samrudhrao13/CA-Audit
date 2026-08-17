@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireCompanyMember, requireRole } from "../middleware/profile.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { runDocumentRequestForOrg } from "../lib/scheduler.js";
+import { setOrgMailConfig } from "../lib/orgMailConfig.js";
 
 export const emailScheduleRouter = Router();
 
@@ -14,9 +15,35 @@ emailScheduleRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const snap = await db.collection("organizations").doc(req.orgId).get();
+    const data = snap.data();
     res.json({
-      schedule: snap.data()?.emailSchedule ?? { dayOfMonth: 1, hourUTC: 9, minuteUTC: 0, enabled: false },
+      schedule: data?.emailSchedule ?? { dayOfMonth: 1, hourUTC: 9, minuteUTC: 0, enabled: false },
+      // Never the app password — just enough to show what's configured (or that it's still
+      // falling back to the platform default account).
+      senderEmail: data?.emailConfig?.fromEmail ?? null,
     });
+  })
+);
+
+const senderSchema = z.object({
+  fromEmail: z.string().email(),
+  appPassword: z.string().min(1),
+});
+
+/** Each company sends its own automated emails (document requests, challan/invoice copies)
+ *  from its own Gmail account, not the platform's shared one — set that here. The app password
+ *  is a Gmail "app password" (Google Account → Security → App passwords), never the actual
+ *  account login password. */
+emailScheduleRouter.put(
+  "/sender",
+  requireRole("COMPANY_ADMIN"),
+  asyncHandler(async (req, res) => {
+    const parsed = senderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    }
+    await setOrgMailConfig(req.orgId, parsed.data.fromEmail, parsed.data.appPassword);
+    res.json({ ok: true });
   })
 );
 
