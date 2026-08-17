@@ -15,6 +15,7 @@ import {
   parseInvoiceExcel,
   reconcile,
   buildReconciliationExcelBuffer,
+  buildReconciliationPdfBuffer,
 } from "../lib/gstReconciliation.js";
 
 export const gstRouter = Router({ mergeParams: true });
@@ -338,5 +339,24 @@ gstRouter.get(
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.xlsx"`);
     res.send(Buffer.from(buffer));
+  })
+);
+
+gstRouter.get(
+  "/reconciliation/:period/export-pdf",
+  asyncHandler(async (req, res) => {
+    const client = await loadGstClient(req, res);
+    if (!client) return;
+
+    const snap = await reconciliationRef(req.orgId, req.params.clientId, req.params.period).get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "No reconciliation run for this period yet" });
+    }
+
+    const buffer = await buildReconciliationPdfBuffer(snap.data(), { clientName: client.name, period: req.params.period });
+    const filenameBase = `${client.name.replace(/[^a-z0-9]+/gi, "_")}_GSTR2B_Reconciliation_${req.params.period}`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.pdf"`);
+    res.send(buffer);
   })
 );

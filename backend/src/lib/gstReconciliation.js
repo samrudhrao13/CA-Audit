@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 import { normalizeDateToDdMmYyyy, periodFromDdMmYyyy } from "./dateUtils.js";
 
 /**
@@ -357,4 +358,211 @@ export async function buildReconciliationExcelBuffer(result, { clientName, perio
   });
 
   return workbook.xlsx.writeBuffer();
+}
+
+const PDF_MONEY = (n) => `Rs ${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const PDF_INK = "#0f172a";
+const PDF_MUTED = "#475569";
+const PDF_HEADER_BG = "#e2e8f0";
+const PDF_STRIPE_BG = "#f8fafc";
+const PDF_FLAG_BG = "#ffe0b2";
+const PDF_TABLE_COLS = [
+  { label: "GSTIN", width: 82 },
+  { label: "Invoice No.", width: 68 },
+  { label: "Date", width: 52 },
+  { label: "Taxable Value", width: 62 },
+  { label: "IGST", width: 48 },
+  { label: "CGST", width: 48 },
+  { label: "SGST", width: 48 },
+  { label: "Total Tax", width: 62 },
+];
+
+/** Draws a paginated table starting at the document's current y position. Redraws the header
+ *  row on every new page so a table split across pages is still readable on its own. */
+function drawInvoiceTable(doc, rows) {
+  const startX = doc.page.margins.left;
+  const tableWidth = PDF_TABLE_COLS.reduce((sum, c) => sum + c.width, 0);
+  const rowHeight = 16;
+  const headerHeight = 18;
+
+  function drawHeader() {
+    const y = doc.y;
+    doc.rect(startX, y, tableWidth, headerHeight).fill(PDF_HEADER_BG);
+    doc.fillColor(PDF_INK).font("Helvetica-Bold").fontSize(7.5);
+    let x = startX;
+    for (const col of PDF_TABLE_COLS) {
+      doc.text(col.label, x + 3, y + 5, { width: col.width - 6, height: 9, ellipsis: true });
+      x += col.width;
+    }
+    doc.y = y + headerHeight;
+  }
+
+  function ensureSpace(height) {
+    if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage();
+      drawHeader();
+    }
+  }
+
+  drawHeader();
+  doc.font("Helvetica").fontSize(7.5);
+  rows.forEach((r, idx) => {
+    ensureSpace(rowHeight);
+    const y = doc.y;
+    if (idx % 2 === 1) {
+      doc.rect(startX, y, tableWidth, rowHeight).fill(PDF_STRIPE_BG);
+    }
+    doc.fillColor(PDF_INK);
+    const cells = [
+      r.gstin,
+      r.invoiceNumber,
+      r.invoiceDate,
+      PDF_MONEY(r.taxableValue),
+      PDF_MONEY(r.igst),
+      PDF_MONEY(r.cgst),
+      PDF_MONEY(r.sgst),
+      PDF_MONEY(r.igst + r.cgst + r.sgst),
+    ];
+    let x = startX;
+    cells.forEach((cell, i) => {
+      doc.text(String(cell), x + 3, y + 4, { width: PDF_TABLE_COLS[i].width - 6, height: 9, ellipsis: true });
+      x += PDF_TABLE_COLS[i].width;
+    });
+    doc.y = y + rowHeight;
+  });
+  doc.moveDown(1);
+}
+
+/** Draws the "matched but amounts differ" section — a client line and a GSTR-2B line per
+ *  invoice, since fitting a 10-column side-by-side table in portrait isn't legible. */
+function drawMismatchSection(doc, mismatched) {
+  const startX = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+  for (const { client, gstr2b } of mismatched) {
+    if (doc.y + 46 > doc.page.height - doc.page.margins.bottom) doc.addPage();
+
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(PDF_INK);
+    doc.text(`Invoice ${client.invoiceNumber}  —  GSTIN ${client.gstin}`, startX, doc.y, { width });
+
+    doc.font("Helvetica").fontSize(7.5).fillColor(PDF_MUTED);
+    doc.text(
+      `Client:   Taxable ${PDF_MONEY(client.taxableValue)}   IGST ${PDF_MONEY(client.igst)}   CGST ${PDF_MONEY(client.cgst)}   SGST ${PDF_MONEY(client.sgst)}`,
+      startX,
+      doc.y + 2,
+      { width }
+    );
+    doc.rect(startX, doc.y + 2, width, 12).fill(PDF_FLAG_BG);
+    doc.fillColor(PDF_INK).text(
+      `GSTR-2B:  Taxable ${PDF_MONEY(gstr2b.taxableValue)}   IGST ${PDF_MONEY(gstr2b.igst)}   CGST ${PDF_MONEY(gstr2b.cgst)}   SGST ${PDF_MONEY(gstr2b.sgst)}`,
+      startX + 3,
+      doc.y + 4,
+      { width: width - 6 }
+    );
+    doc.moveDown(1.1);
+  }
+}
+
+function drawSectionHeading(doc, title, note) {
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  if (doc.y + 40 > doc.page.height - doc.page.margins.bottom) doc.addPage();
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(PDF_INK).text(title, doc.page.margins.left, doc.y, { width });
+  doc.font("Helvetica").fontSize(8.5).fillColor(PDF_MUTED).text(note, doc.page.margins.left, doc.y + 3, { width });
+  doc.moveDown(0.6);
+}
+
+/** Builds an auditor-facing PDF: client name and period up front, a highlighted amount-pending
+ *  summary, then the same three buckets as the Excel export (in full — every invoice number,
+ *  not just counts) plus a short plain-language note per bucket on what it actually means for
+ *  the client's ITC position. */
+export function buildReconciliationPdfBuffer(result, { clientName, period }) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+    doc.font("Helvetica-Bold").fontSize(18).fillColor(PDF_INK).text("GSTR-2B Reconciliation Report");
+    doc.moveDown(0.3);
+    doc.font("Helvetica-Bold").fontSize(14).text(`Client: ${clientName}`);
+    doc.font("Helvetica").fontSize(10).fillColor(PDF_MUTED);
+    doc.text(`Period: ${period}`);
+    doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`);
+    doc.moveDown(0.8);
+
+    // Summary
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(PDF_INK).text("Summary");
+    doc.moveDown(0.2);
+    doc.font("Helvetica").fontSize(9).fillColor(PDF_INK);
+    const summaryLines = [
+      `Matched invoices (present and agreeing on both sides): ${result.matched.length}`,
+      `Matched but amounts differ: ${result.mismatched.length}`,
+      `Client invoices missing from GSTR-2B: ${result.clientOnly.length}`,
+      `GSTR-2B entries with no invoice from client: ${result.gstr2bOnly.length}`,
+    ];
+    for (const line of summaryLines) doc.text(line);
+    doc.moveDown(0.4);
+
+    const boxY = doc.y;
+    doc.rect(doc.page.margins.left, boxY, width, 34).fill("#fff3e0");
+    doc.fillColor("#7c2d12").font("Helvetica-Bold").fontSize(11);
+    doc.text("ITC to be reversed / paid by the client", doc.page.margins.left + 10, boxY + 6, { width: width - 20 });
+    doc.fontSize(14).text(PDF_MONEY(result.amountToPay), doc.page.margins.left + 10, boxY + 18, { width: width - 20 });
+    doc.y = boxY + 34;
+    doc.moveDown(1);
+
+    // Section 1
+    drawSectionHeading(
+      doc,
+      `Client invoices missing from GSTR-2B (${result.clientOnly.length})`,
+      "The client provided these invoices, but the supplier hasn't reflected them in their GSTR-1/IFF filing (as shown in GSTR-2B). Under Section 16(2)(aa) / Rule 36(4), ITC on these invoices isn't currently eligible to claim — the amount above is what would need to be reversed or paid until the supplier files the matching invoice."
+    );
+    if (result.clientOnly.length > 0) {
+      drawInvoiceTable(doc, result.clientOnly);
+    } else {
+      doc.font("Helvetica").fontSize(9).fillColor(PDF_MUTED).text("None — every client invoice is backed by GSTR-2B.");
+      doc.moveDown(1);
+    }
+
+    // Section 2
+    drawSectionHeading(
+      doc,
+      `In GSTR-2B but not provided by client (${result.gstr2bOnly.length})`,
+      "ITC is available on these per GSTR-2B, but the client hasn't submitted the invoice yet. This is unclaimed credit sitting on the table — worth following up with the client to collect these invoices so the ITC can actually be availed."
+    );
+    if (result.gstr2bOnly.length > 0) {
+      drawInvoiceTable(doc, result.gstr2bOnly);
+    } else {
+      doc.font("Helvetica").fontSize(9).fillColor(PDF_MUTED).text("None — every GSTR-2B entry has a matching client invoice.");
+      doc.moveDown(1);
+    }
+
+    // Section 3
+    if (result.mismatched.length > 0) {
+      drawSectionHeading(
+        doc,
+        `Matched but amounts differ (${result.mismatched.length})`,
+        "Same GSTIN and invoice number appear on both sides, but the taxable value or tax amounts don't agree — verify against the original invoice. This often points to a data-entry error on one side, but can also mean the supplier amended the invoice after the client recorded it."
+      );
+      drawMismatchSection(doc, result.mismatched);
+    }
+
+    // Footer note on every page
+    const pageCount = doc.bufferedPageRange().count;
+    for (let i = 0; i < pageCount; i++) {
+      doc.switchToPage(i);
+      doc.font("Helvetica").fontSize(7).fillColor(PDF_MUTED).text(
+        "Matching is by supplier GSTIN + invoice number, from the GSTR-2B B2B sheet only (credit/debit notes, ISD, imports excluded). " +
+          `Page ${i + 1} of ${pageCount}.`,
+        doc.page.margins.left,
+        doc.page.height - doc.page.margins.bottom + 10,
+        { width, align: "center" }
+      );
+    }
+
+    doc.end();
+  });
 }

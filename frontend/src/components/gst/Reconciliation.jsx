@@ -85,6 +85,10 @@ export function Reconciliation({ clientId }) {
     await api.download(`/api/clients/${clientId}/gst/reconciliation/${period}/export`);
   }
 
+  async function handleExportPdf() {
+    await api.download(`/api/clients/${clientId}/gst/reconciliation/${period}/export-pdf`);
+  }
+
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>GSTR-2B reconciliation</h2>
@@ -156,9 +160,14 @@ export function Reconciliation({ clientId }) {
                   `${result.skippedInvoiceRows.unparseableDate} row(s) had an invoice date that couldn't be read, skipped.`}
               </p>
             )}
-            <button type="button" className="secondary" style={{ marginTop: 8 }} onClick={handleExport}>
-              Download Excel report
-            </button>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className="secondary" onClick={handleExportPdf}>
+                Download PDF report
+              </button>
+              <button type="button" className="secondary" onClick={handleExport}>
+                Download Excel report
+              </button>
+            </div>
           </div>
 
           <div style={{ marginTop: 16 }}>
