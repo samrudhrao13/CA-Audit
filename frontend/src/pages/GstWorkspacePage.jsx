@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { CredentialForm } from "../components/gst/CredentialForm";
 import { RunPanel } from "../components/gst/RunPanel";
@@ -55,21 +55,21 @@ export function GstWorkspacePage() {
 
       <div className="card">
         <p style={{ marginTop: 0, fontWeight: 600 }}>Document checklist{period ? ` — ${period}` : ""}</p>
-        <ProgressBar
-          stage={wfProgress?.stage ?? "not_started"}
-          percent={wfProgress?.percent ?? 0}
-          documentsUploaded={wfProgress?.documentsUploaded ?? 0}
-          documentsTotal={wfProgress?.documentsTotal ?? (docCount || null)}
-        />
         {docCount > 0 ? (
-          <Link to={`/clients/${clientId}/documents/GST`} style={{ display: "inline-block", marginTop: 8 }}>
-            <button className="secondary">Open document checklist &rarr;</button>
-          </Link>
+          <ProgressBar
+            stage={wfProgress?.stage ?? "not_started"}
+            documentsUploaded={wfProgress?.documentsUploaded ?? 0}
+            documentsTotal={wfProgress?.documentsTotal ?? docCount}
+            linkTo={`/clients/${clientId}/documents/GST`}
+          />
         ) : (
-          <p className="muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
-            No documents selected for this client yet — a company admin can pick which ones apply
-            under Clients → this client → Edit client → "Document checklist."
-          </p>
+          <>
+            <ProgressBar stage={wfProgress?.stage ?? "not_started"} documentsUploaded={0} documentsTotal={null} />
+            <p className="muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
+              No documents selected for this client yet — a company admin can pick which ones apply
+              under Clients → this client → Edit client → "Document checklist."
+            </p>
+          </>
         )}
       </div>
 

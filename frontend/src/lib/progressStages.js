@@ -1,5 +1,5 @@
 // Must match backend/src/lib/workflowProgress.js's PROGRESS_STAGES.
-export const PROGRESS_STAGES = ["documents_requested", "documents_received", "ready_for_filing", "filed"];
+export const PROGRESS_STAGES = ["documents_requested", "documents_received", "ready_for_filing", "filed", "billed"];
 
 export const STAGE_LABELS = {
   not_started: "Not started",
@@ -7,6 +7,7 @@ export const STAGE_LABELS = {
   documents_received: "Documents received",
   ready_for_filing: "Ready for filing",
   filed: "Filed",
+  billed: "Billed",
 };
 
 // A gray-to-green progression so the stage a client is in reads as
@@ -17,6 +18,7 @@ export const STAGE_COLORS = {
   documents_received: "#3b82f6",
   ready_for_filing: "#8b5cf6",
   filed: "#059669",
+  billed: "#0d9488",
 };
 
 export function nextStage(current) {

@@ -64,7 +64,9 @@ workflowProgressRouter.post(
   })
 );
 
-/** Per-workflow counts of clients in each stage, for the dashboard's consolidated view. */
+/** Per-workflow counts of clients in each stage, for the dashboard's consolidated view — plus
+ *  the actual client list behind those counts, so the dashboard can link straight through to a
+ *  specific client's workflow instead of just showing a dead aggregate number. */
 workflowProgressRouter.get(
   "/summary",
   asyncHandler(async (req, res) => {
@@ -73,21 +75,29 @@ workflowProgressRouter.get(
     const visibleClients = clientsSnap.docs.filter((d) => canAccessClient(req, d.data()));
 
     const counts = {}; // { [workflowKey]: { [stage]: n, not_started: n } }
+    const clients = {}; // { [workflowKey]: [{ id, name, stage }] }
 
     await Promise.all(
       visibleClients.map(async (clientDoc) => {
-        const enrolled = clientDoc.data().enrolledWorkflows || [];
+        const clientData = clientDoc.data();
+        const enrolled = (clientData.enrolledWorkflows || []).filter((key) => canAccessWorkflow(req, clientData, key));
         if (enrolled.length === 0) return;
 
         const progress = await getClientProgress(req.orgId, clientDoc.id, period);
         for (const workflowKey of enrolled) {
           counts[workflowKey] ??= { not_started: 0 };
+          clients[workflowKey] ??= [];
           const stage = progress[workflowKey]?.stage ?? "not_started";
           counts[workflowKey][stage] = (counts[workflowKey][stage] ?? 0) + 1;
+          clients[workflowKey].push({ id: clientDoc.id, name: clientData.name, stage });
         }
       })
     );
 
-    res.json({ period, counts });
+    for (const workflowKey of Object.keys(clients)) {
+      clients[workflowKey].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    res.json({ period, counts, clients });
   })
 );

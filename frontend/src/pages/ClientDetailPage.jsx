@@ -8,8 +8,8 @@ import { CopyField } from "../components/CopyField";
 import { ClientFormFields } from "../components/ClientFormFields";
 import { describeTdsCode } from "../lib/tdsCodes";
 import { describeSacCode } from "../lib/sacCodes";
-import { BulkInvoiceUpload } from "../components/BulkInvoiceUpload";
 import { CompanyDocumentsUpload } from "../components/CompanyDocumentsUpload";
+import { CompanyDocumentsModal } from "../components/CompanyDocumentsModal";
 import { HandscribeExtract } from "../components/HandscribeExtract";
 
 // Workflows with their own dedicated workspace page (credentials + fetch + export).
@@ -42,6 +42,7 @@ export function ClientDetailPage() {
   const [workflowAssignmentDrafts, setWorkflowAssignmentDrafts] = useState({});
   const [workflowAssignmentStatus, setWorkflowAssignmentStatus] = useState({});
   const [editing, setEditing] = useState(false);
+  const [showDocsModal, setShowDocsModal] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState(null);
@@ -243,13 +244,20 @@ export function ClientDetailPage() {
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ margin: 0 }}>{client.name}</h1>
-          {isAdmin && !editing && (
+          {!editing && (
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {deleteError && <span className="error-text">{deleteError}</span>}
-              <button onClick={startEdit}>Edit client</button>
-              <button type="button" className="secondary" onClick={handleDelete} disabled={deleting}>
-                {deleting ? "Deleting..." : "Delete client"}
+              <button type="button" className="secondary" onClick={() => setShowDocsModal(true)}>
+                View company documents
               </button>
+              {isAdmin && (
+                <>
+                  <button onClick={startEdit}>Edit client</button>
+                  <button type="button" className="secondary" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? "Deleting..." : "Delete client"}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -526,32 +534,32 @@ export function ClientDetailPage() {
 
                 {enrolled && (
                   <div>
-                    <ProgressBar
-                      stage={wfProgress?.stage ?? "not_started"}
-                      percent={wfProgress?.percent ?? 0}
-                      documentsUploaded={wfProgress?.documentsUploaded ?? 0}
-                      documentsTotal={wfProgress?.documentsTotal ?? (clientDocCount || null)}
-                    />
                     {clientDocCount > 0 ? (
-                      <Link to={`/clients/${client.id}/documents/${wf.key}`} style={{ display: "inline-block", marginTop: 8 }}>
-                        <button className="secondary">Open document checklist &rarr;</button>
-                      </Link>
+                      <ProgressBar
+                        stage={wfProgress?.stage ?? "not_started"}
+                        documentsUploaded={wfProgress?.documentsUploaded ?? 0}
+                        documentsTotal={wfProgress?.documentsTotal ?? clientDocCount}
+                        linkTo={`/clients/${client.id}/documents/${wf.key}`}
+                      />
                     ) : (
-                      (wfProgress?.stage ?? null) !== "filed" &&
-                      (isAdmin ? (
-                        <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>
-                          Read-only — company users advance this workflow's progress.
-                        </p>
-                      ) : (
-                        <button
-                          className="secondary"
-                          style={{ marginTop: 8 }}
-                          disabled={busyKey === `progress:${wf.key}`}
-                          onClick={() => advanceStage(wf.key, wfProgress?.stage)}
-                        >
-                          Advance to next stage
-                        </button>
-                      ))
+                      <>
+                        <ProgressBar stage={wfProgress?.stage ?? "not_started"} documentsUploaded={0} documentsTotal={null} />
+                        {(wfProgress?.stage ?? null) !== "filed" &&
+                          (isAdmin ? (
+                            <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>
+                              Read-only — company users advance this workflow's progress.
+                            </p>
+                          ) : (
+                            <button
+                              className="secondary"
+                              style={{ marginTop: 8 }}
+                              disabled={busyKey === `progress:${wf.key}`}
+                              onClick={() => advanceStage(wf.key, wfProgress?.stage)}
+                            >
+                              Advance to next stage
+                            </button>
+                          ))}
+                      </>
                     )}
 
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e2e8f0" }}>
@@ -624,9 +632,15 @@ export function ClientDetailPage() {
 
       <HandscribeExtract clientId={client.id} isAdmin={isAdmin} />
 
-      <BulkInvoiceUpload clientId={client.id} />
+      {isAdmin && <CompanyDocumentsUpload clientId={client.id} />}
 
-      <CompanyDocumentsUpload clientId={client.id} />
+      {showDocsModal && (
+        <CompanyDocumentsModal
+          clientId={client.id}
+          clientName={client.name}
+          onClose={() => setShowDocsModal(false)}
+        />
+      )}
     </div>
   );
 }

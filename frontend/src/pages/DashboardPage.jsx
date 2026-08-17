@@ -144,24 +144,59 @@ export function DashboardPage() {
       )}
 
       <div>
-        <h2 style={{ marginBottom: 12 }}>Workflow progress{progressSummary ? ` — ${progressSummary.period}` : ""}</h2>
+        <h2 style={{ marginBottom: 2 }}>Workflow progress{progressSummary ? ` — ${progressSummary.period}` : ""}</h2>
+        {progressSummary && Object.keys(progressSummary.counts).length > 0 && (
+          <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+            How your enrolled clients are distributed across each stage — not a single client's
+            document count.
+          </p>
+        )}
         {!progressSummary || Object.keys(progressSummary.counts).length === 0 ? (
           <p className="muted">No clients enrolled in a workflow yet.</p>
         ) : (
           <div className="stack" style={{ gap: 12 }}>
-            {Object.entries(progressSummary.counts).map(([workflowKey, stageCounts]) => (
-              <div key={workflowKey} className="card">
-                <p style={{ marginTop: 0, marginBottom: 10, fontWeight: 700 }}>{workflowKey}</p>
-                <StageBar stageCounts={stageCounts} />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-                  {STAGE_ORDER.filter((stage) => stageCounts[stage]).map((stage) => (
-                    <Badge key={stage} color={STAGE_COLORS[stage]}>
-                      {STAGE_LABELS[stage]}: {stageCounts[stage]}
-                    </Badge>
-                  ))}
+            {Object.entries(progressSummary.counts).map(([workflowKey, stageCounts]) => {
+              const workflowClients = progressSummary.clients?.[workflowKey] || [];
+              return (
+                <div key={workflowKey} className="card">
+                  <p style={{ marginTop: 0, marginBottom: 10, fontWeight: 700 }}>{workflowKey}</p>
+                  <StageBar stageCounts={stageCounts} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+                    {STAGE_ORDER.filter((stage) => stageCounts[stage]).map((stage) => (
+                      <Badge key={stage} color={STAGE_COLORS[stage]}>
+                        {STAGE_LABELS[stage]}: {stageCounts[stage]} client{stageCounts[stage] === 1 ? "" : "s"}
+                      </Badge>
+                    ))}
+                  </div>
+
+                  {workflowClients.length > 0 && (
+                    <div style={{ marginTop: 12, borderTop: "1px solid var(--border-soft)", paddingTop: 8 }}>
+                      {workflowClients.map((c) => (
+                        <Link
+                          key={c.id}
+                          to={`/clients/${c.id}/documents/${workflowKey}`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            fontSize: 13,
+                            padding: "6px 4px",
+                            borderRadius: 6,
+                            transition: "background 160ms ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <span>{c.name}</span>
+                          <Badge color={STAGE_COLORS[c.stage]}>{STAGE_LABELS[c.stage]}</Badge>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
