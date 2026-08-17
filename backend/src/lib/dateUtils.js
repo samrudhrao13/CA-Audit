@@ -4,6 +4,20 @@ const MONTH_NAMES = {
   sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
 };
 
+const MONTH_LABELS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "2026-08" -> "August2026" — used to name/label period-specific files like the TDS challan. */
+export function formatPeriodLabel(period) {
+  const m = String(period ?? "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return String(period ?? "");
+  const monthIndex = Number(m[2]) - 1;
+  const monthName = MONTH_LABELS[monthIndex] || m[2];
+  return `${monthName}${m[1]}`;
+}
+
 function pad2(n) {
   return String(n).padStart(2, "0");
 }

@@ -8,6 +8,17 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessWorkflow } from "../lib/clientAccess.js";
 import { currentPeriod, setProgressStage, getClientProgress } from "../lib/workflowProgress.js";
 import { uploadCompanyDocumentToDrive } from "../lib/googleDrive.js";
+import { markChecklistDocumentUploaded } from "../lib/documentChecklist.js";
+import { sendMail } from "../lib/mailer.js";
+import { getOrgMailConfig } from "../lib/orgMailConfig.js";
+import { formatPeriodLabel } from "../lib/dateUtils.js";
+
+// TDS and GST both get one extra, non-configurable checklist item appended after whatever the
+// admin picked: the challan (proof of tax payment) can only be filed once every real document
+// is in, so it's modeled as the last item in the same checklist rather than a separate flow.
+// PT/other workflows don't get one — extend this list if a future workflow needs it too.
+const CHALLAN_WORKFLOWS = ["TDS", "GST"];
+const CHALLAN_DOCUMENT_NAME = "Challan";
 
 export const documentsRouter = Router();
 
@@ -67,6 +78,9 @@ async function loadClientAndCatalog(req, res, workflowKey) {
   // since not every client needs every document.
   const selection = client.documentChecklistConfig?.[workflowKey];
   const requiredDocuments = [...(selection?.predefinedSelected || []), ...(selection?.otherDocuments || [])];
+  if (CHALLAN_WORKFLOWS.includes(workflowKey) && requiredDocuments.length > 0) {
+    requiredDocuments.push(CHALLAN_DOCUMENT_NAME);
+  }
   return { client: { id: clientSnap.id, ...client }, requiredDocuments };
 }
 
@@ -110,7 +124,24 @@ documentsRouter.post(
       return res.status(400).json({ error: "Not a recognized document for this workflow" });
     }
 
-    const ref = checklistRef(req.orgId, req.params.clientId, req.params.workflowKey, period);
+    const isChallan = CHALLAN_WORKFLOWS.includes(req.params.workflowKey) && documentName === CHALLAN_DOCUMENT_NAME;
+    if (isChallan) {
+      // The challan is the last step — every other document on this client's checklist for
+      // this workflow must already be in before it can be uploaded.
+      const checklistSnap = await checklistRef(req.orgId, req.params.clientId, req.params.workflowKey, period).get();
+      const uploadedMap = checklistSnap.exists ? checklistSnap.data().documents || {} : {};
+      const otherDocsDone = loaded.requiredDocuments
+        .filter((name) => name !== CHALLAN_DOCUMENT_NAME)
+        .every((name) => uploadedMap[name]?.uploaded);
+      if (!otherDocsDone) {
+        return res.status(400).json({ error: `Upload all other ${req.params.workflowKey} documents before the challan.` });
+      }
+    }
+
+    const periodLabel = formatPeriodLabel(period);
+    const extIndex = req.file.originalname.lastIndexOf(".");
+    const ext = extIndex >= 0 ? req.file.originalname.slice(extIndex) : "";
+    const uploadFileName = isChallan ? `Challan_${req.params.workflowKey}_${periodLabel}${ext}` : req.file.originalname;
 
     // Best-effort mirror into Drive (company folder / "Company Documents") — never blocks
     // the checklist upload itself if Drive isn't configured or a call to it fails. Separate
@@ -118,7 +149,7 @@ documentsRouter.post(
     let driveFile = null;
     try {
       driveFile = await uploadCompanyDocumentToDrive(req.orgId, req.params.clientId, {
-        fileName: req.file.originalname,
+        fileName: uploadFileName,
         mimeType: req.file.mimetype,
         buffer: req.file.buffer,
       });
@@ -126,52 +157,56 @@ documentsRouter.post(
       console.error(`Drive: failed to upload document for client ${req.params.clientId}:`, err.message);
     }
 
-    await ref.collection("files").doc(fileDocId(documentName)).set({
+    const { allUploaded } = await markChecklistDocumentUploaded({
+      orgId: req.orgId,
+      clientId: req.params.clientId,
+      workflowKey: req.params.workflowKey,
+      requiredDocuments: loaded.requiredDocuments,
       documentName,
-      fileName: req.file.originalname,
+      period,
+      fileName: uploadFileName,
+      fileSize: req.file.size,
       mimeType: req.file.mimetype,
       dataBase64: req.file.buffer.toString("base64"),
       driveFileId: driveFile?.id ?? null,
       driveWebViewLink: driveFile?.webViewLink ?? null,
+      uploadedByUid: req.uid,
+      source: isChallan ? "challan" : "manual",
     });
 
-    await ref.set(
-      {
-        workflowKey: req.params.workflowKey,
-        period,
-        documents: {
-          [documentName]: {
-            uploaded: true,
-            fileName: req.file.originalname,
-            fileSize: req.file.size,
-            uploadedAt: new Date().toISOString(),
-            uploadedByUid: req.uid,
-            driveWebViewLink: driveFile?.webViewLink ?? null,
-          },
-        },
-      },
-      { merge: true }
-    );
-
-    // Auto-advance the workflow's progress stage from the checklist —
-    // never downgrades a stage that's already further along (e.g. filed).
-    const checklistSnap = await ref.get();
-    const documents = checklistSnap.data().documents || {};
-    const uploadedCount = loaded.requiredDocuments.filter((name) => documents[name]?.uploaded).length;
-    const totalCount = loaded.requiredDocuments.length;
-    const allUploaded = uploadedCount === totalCount;
-
-    const progress = await getClientProgress(req.orgId, req.params.clientId, period);
-    const currentStage = progress[req.params.workflowKey]?.stage;
-    if (currentStage !== "ready_for_filing" && currentStage !== "filed") {
-      await setProgressStage(
-        req.orgId,
-        req.params.clientId,
-        req.params.workflowKey,
-        period,
-        allUploaded ? "ready_for_filing" : "documents_received",
-        { documentsUploaded: uploadedCount, documentsTotal: totalCount }
-      );
+    // Best-effort — a challan upload still succeeds even if the email fails to send
+    // (missing SMTP config, bad recipient, etc.); the file is already saved either way.
+    if (isChallan) {
+      const client = loaded.client;
+      const recipients = [
+        client.notifyCompanyEmail && client.email,
+        client.notifyContactPersonEmail && client.contactPersonEmail,
+      ].filter(Boolean);
+      if (recipients.length > 0) {
+        try {
+          const mailConfig = await getOrgMailConfig(req.orgId);
+          await sendMail(
+            {
+              to: recipients,
+              subject: `${req.params.workflowKey} Challan — ${periodLabel}`,
+              html: `<p>Dear ${client.name || "Sir/Madam"},</p><p>This is to inform you that your ${req.params.workflowKey} return has been filed for ${periodLabel}. Please find attached below a copy of the payment challan/receipt for your records.</p><p>Thank you.</p>`,
+              attachments: [{ filename: uploadFileName, content: req.file.buffer, contentType: req.file.mimetype }],
+            },
+            mailConfig
+          );
+          await clientRef(req.orgId, req.params.clientId)
+            .collection("emailLog")
+            .add({
+              type: "challan_receipt",
+              workflowKey: req.params.workflowKey,
+              period,
+              sentAt: new Date().toISOString(),
+              recipients,
+            });
+        } catch (err) {
+          console.error(`Mail: failed to send ${req.params.workflowKey} challan copy for client ${req.params.clientId}:`, err.message);
+        }
+      }
     }
 
     res.json({ ok: true, allUploaded });
@@ -225,5 +260,94 @@ documentsRouter.post(
     });
 
     res.json({ ok: true });
+  })
+);
+
+/** Records that the client has been billed for this workflow/period — the step after filing,
+ *  not a compliance requirement, so it's gated on "filed" rather than the document checklist.
+ *  Takes the invoice the auditor has already prepared (this app has no fee schedule/billing
+ *  engine of its own), saves it to Drive, and emails a copy straight to the client — same
+ *  pattern as the challan step above, just for the auditor's own bill instead of a government
+ *  receipt. */
+documentsRouter.post(
+  "/client/:clientId/:workflowKey/mark-billed",
+  uploadMiddleware,
+  asyncHandler(async (req, res) => {
+    if (req.role === "COMPANY_ADMIN") {
+      return res.status(403).json({ error: "Marking a workflow as billed is handled by company users — admins have read-only access here." });
+    }
+    const loaded = await loadClientAndCatalog(req, res, req.params.workflowKey);
+    if (!loaded) return;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Attach the invoice to mark this workflow as billed" });
+    }
+    const period = String(req.body.period || currentPeriod());
+    if (!/^\d{4}-\d{2}$/.test(period)) {
+      return res.status(400).json({ error: "Invalid period" });
+    }
+
+    const progress = await getClientProgress(req.orgId, req.params.clientId, period);
+    const currentStage = progress[req.params.workflowKey]?.stage;
+    if (currentStage !== "filed") {
+      return res.status(400).json({ error: "Mark this workflow as filed before marking it billed." });
+    }
+
+    const periodLabel = formatPeriodLabel(period);
+    const extIndex = req.file.originalname.lastIndexOf(".");
+    const ext = extIndex >= 0 ? req.file.originalname.slice(extIndex) : "";
+    const invoiceFileName = `Invoice_${req.params.workflowKey}_${periodLabel}${ext}`;
+
+    let driveFile = null;
+    try {
+      driveFile = await uploadCompanyDocumentToDrive(req.orgId, req.params.clientId, {
+        fileName: invoiceFileName,
+        mimeType: req.file.mimetype,
+        buffer: req.file.buffer,
+      });
+    } catch (err) {
+      console.error(`Drive: failed to upload invoice for client ${req.params.clientId}:`, err.message);
+    }
+
+    await setProgressStage(req.orgId, req.params.clientId, req.params.workflowKey, period, "billed", {
+      billedOn: new Date().toISOString(),
+      invoiceFileName,
+      invoiceDriveWebViewLink: driveFile?.webViewLink ?? null,
+    });
+
+    // Best-effort — billing the workflow still succeeds even if the email fails to send;
+    // the invoice is already saved to Drive either way.
+    const client = loaded.client;
+    const recipients = [
+      client.notifyCompanyEmail && client.email,
+      client.notifyContactPersonEmail && client.contactPersonEmail,
+    ].filter(Boolean);
+    if (recipients.length > 0) {
+      try {
+        const mailConfig = await getOrgMailConfig(req.orgId);
+        await sendMail(
+          {
+            to: recipients,
+            subject: `Invoice — ${req.params.workflowKey} services — ${periodLabel}`,
+            html: `<p>Dear ${client.name || "Sir/Madam"},</p><p>Please find attached the invoice for ${req.params.workflowKey} compliance services rendered for ${periodLabel}.</p><p>Thank you for your business.</p>`,
+            attachments: [{ filename: invoiceFileName, content: req.file.buffer, contentType: req.file.mimetype }],
+          },
+          mailConfig
+        );
+        await clientRef(req.orgId, req.params.clientId)
+          .collection("emailLog")
+          .add({
+            type: "invoice",
+            workflowKey: req.params.workflowKey,
+            period,
+            sentAt: new Date().toISOString(),
+            recipients,
+          });
+      } catch (err) {
+        console.error(`Mail: failed to send invoice for client ${req.params.clientId}:`, err.message);
+      }
+    }
+
+    res.json({ ok: true, invoiceFileName, invoiceDriveWebViewLink: driveFile?.webViewLink ?? null });
   })
 );

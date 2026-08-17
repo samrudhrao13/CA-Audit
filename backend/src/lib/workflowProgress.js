@@ -7,7 +7,7 @@ import { db } from "./firebaseAdmin.js";
  * workflow shares this same sequence for now — real per-workflow variations
  * come later, per the plan to build workflows one at a time.
  */
-export const PROGRESS_STAGES = ["documents_requested", "documents_received", "ready_for_filing", "filed"];
+export const PROGRESS_STAGES = ["documents_requested", "documents_received", "ready_for_filing", "filed", "billed"];
 
 export function stagePercent(stage) {
   const index = PROGRESS_STAGES.indexOf(stage);
@@ -19,7 +19,7 @@ export function stagePercent(stage) {
  *  and the "X of Y documents uploaded" label next to it can visibly disagree (e.g. a stage
  *  advanced manually before a client had any documents configured shows 50% at 0 of 5). */
 function effectivePercent(stage, documentsUploaded, documentsTotal) {
-  if (stage === "filed") return 100;
+  if (stage === "filed" || stage === "billed") return 100;
   if (documentsTotal) {
     return Math.round(((documentsUploaded || 0) / documentsTotal) * 100);
   }
@@ -56,8 +56,10 @@ export async function setProgressStage(orgId, clientId, workflowKey, period, sta
 export function summarizeClientStatus(enrolledWorkflows, progress) {
   if (!enrolledWorkflows || enrolledWorkflows.length === 0) return "not_set_up";
   const stages = enrolledWorkflows.map((key) => progress[key]?.stage || null);
-  if (stages.every((s) => s === "filed")) return "up_to_date";
-  if (stages.some((s) => s === "documents_received" || s === "ready_for_filing" || s === "filed")) {
+  // Compliance-wise a client is "up to date" once filed — billing is a business/admin step
+  // on top of that, not a further compliance requirement, so it counts too.
+  if (stages.every((s) => s === "filed" || s === "billed")) return "up_to_date";
+  if (stages.some((s) => s === "documents_received" || s === "ready_for_filing" || s === "filed" || s === "billed")) {
     return "in_progress";
   }
   return "action_needed";
@@ -72,6 +74,9 @@ export async function getClientProgress(orgId, clientId, period) {
       stage: data.stage,
       percent: effectivePercent(data.stage, data.documentsUploaded, data.documentsTotal),
       filedOn: data.filedOn ?? null,
+      billedOn: data.billedOn ?? null,
+      invoiceFileName: data.invoiceFileName ?? null,
+      invoiceDriveWebViewLink: data.invoiceDriveWebViewLink ?? null,
       documentsUploaded: data.documentsUploaded ?? null,
       documentsTotal: data.documentsTotal ?? null,
       updatedAt: data.updatedAt,
