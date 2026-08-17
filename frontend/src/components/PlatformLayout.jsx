@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { BuildingIcon, CatalogIcon, LogoutIcon, MenuIcon, CloseIcon } from "./icons";
+import { BackButton } from "./BackButton";
 
 const PLATFORM_NAME = import.meta.env.VITE_PLATFORM_NAME || "SARN Technologies Pvt Ltd";
 const PLATFORM_URL = import.meta.env.VITE_PLATFORM_URL || "https://www.sarntech.in/";
@@ -56,10 +57,12 @@ export function PlatformLayout() {
 
       <div className="app-main">
         <header className="topbar">
-          <button className="sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
-            {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-          </button>
-          <span />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button className="sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+            <BackButton />
+          </div>
           <div className="topbar-user">
             <button
               className="secondary signout-btn"

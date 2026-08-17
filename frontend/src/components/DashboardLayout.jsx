@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useUserProfile } from "../context/UserProfileContext";
 import { ComplianceBanner } from "./ComplianceBanner";
 import { AccountIcon } from "./AccountIcon";
+import { BackButton } from "./BackButton";
 import {
   DashboardIcon,
   ClientsIcon,
@@ -104,10 +105,12 @@ export function DashboardLayout() {
 
       <div className="app-main">
         <header className="topbar">
-          <button className="sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
-            {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
-          </button>
-          <span />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button className="sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle menu">
+              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+            <BackButton />
+          </div>
           <div className="topbar-user">
             <Link to="/profile" className="topbar-account-link" title="My profile & settings">
               <AccountIcon size={24} />
