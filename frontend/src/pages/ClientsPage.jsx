@@ -8,6 +8,8 @@ import { CLIENT_STATUS_META } from "../lib/clientStatus";
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
 import { ClientFormFields } from "../components/ClientFormFields";
+import { CompanyDocumentsUpload } from "../components/CompanyDocumentsUpload";
+import { CompanyDocumentsModal } from "../components/CompanyDocumentsModal";
 
 const EMPTY_FORM = {
   name: "",
@@ -74,6 +76,8 @@ export function ClientsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [createdClient, setCreatedClient] = useState(null);
+  const [viewingDocsFor, setViewingDocsFor] = useState(null);
 
   async function load() {
     const [{ clients }, { subscriptions }, { members }] = await Promise.all([
@@ -108,15 +112,23 @@ export function ClientsPage() {
     setCreating(true);
     setError(null);
     try {
-      await api.post("/api/clients", form);
+      const client = await api.post("/api/clients", form);
       setForm(EMPTY_FORM);
-      setShowCreateForm(false);
+      // Don't close the form yet — the client now exists, so this is the first point a
+      // company-documents upload can target it (Drive folders are per-client). Step into a
+      // "upload documents now" stage instead, refreshing the list in the background.
+      setCreatedClient(client);
       await load();
     } catch (err) {
       setError(err.message);
     } finally {
       setCreating(false);
     }
+  }
+
+  function finishCreateFlow() {
+    setCreatedClient(null);
+    setShowCreateForm(false);
   }
 
   async function handleDelete(e, client) {
@@ -187,7 +199,7 @@ export function ClientsPage() {
         )}
       </div>
 
-      {isAdmin && showCreateForm && (
+      {isAdmin && showCreateForm && !createdClient && (
       <form onSubmit={handleCreate} className="card stack" style={{ gap: 20 }}>
         <ClientFormFields form={form} setField={setField} setFormValue={setFormValue} subscriptions={subscriptions} />
 
@@ -229,6 +241,22 @@ export function ClientsPage() {
           </button>
         </div>
       </form>
+      )}
+
+      {isAdmin && createdClient && (
+        <div className="card stack" style={{ gap: 16 }}>
+          <p style={{ margin: 0 }}>
+            <strong>{createdClient.name}</strong> was added. Upload any registration certificates,
+            agreements, or other company documents now, or skip and add them later from the
+            client's page.
+          </p>
+          <CompanyDocumentsUpload clientId={createdClient.id} />
+          <div>
+            <button type="button" onClick={finishCreateFlow}>
+              Done
+            </button>
+          </div>
+        </div>
       )}
 
       {clients !== null && clients.length > 0 && (
@@ -364,6 +392,18 @@ export function ClientsPage() {
                       : "Unassigned"}
                   </span>
                 </Link>
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setViewingDocsFor(client);
+                  }}
+                >
+                  Documents
+                </button>
                 {isAdmin && (
                   <button
                     type="button"
@@ -381,6 +421,14 @@ export function ClientsPage() {
         </ul>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </>
+      )}
+
+      {viewingDocsFor && (
+        <CompanyDocumentsModal
+          clientId={viewingDocsFor.id}
+          clientName={viewingDocsFor.name}
+          onClose={() => setViewingDocsFor(null)}
+        />
       )}
     </div>
   );

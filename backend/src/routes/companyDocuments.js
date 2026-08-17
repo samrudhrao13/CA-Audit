@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { db } from "../lib/firebaseAdmin.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requireCompanyMember } from "../middleware/profile.js";
+import { requireCompanyMember, requireRole } from "../middleware/profile.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessClient } from "../lib/clientAccess.js";
 import { uploadCompanyDocumentToDrive } from "../lib/googleDrive.js";
@@ -64,6 +64,7 @@ companyDocumentsRouter.get(
 
 companyDocumentsRouter.post(
   "/upload",
+  requireRole("COMPANY_ADMIN"),
   uploadMiddleware,
   asyncHandler(async (req, res) => {
     const client = await loadClient(req, res);
