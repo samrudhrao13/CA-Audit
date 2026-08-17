@@ -32,23 +32,41 @@ export function CompanyDocumentsUpload({ clientId }) {
     setError(null);
     setResults([]);
 
+    const existingFileNames = new Set((history || []).map((h) => (h.fileName || "").toLowerCase()));
+
     const collected = [];
     const errors = [];
+    const skipped = [];
     for (let i = 0; i < files.length; i++) {
       setProgress({ done: i, total: files.length });
       const file = files[i];
+
+      if (existingFileNames.has(file.name.toLowerCase())) {
+        const proceed = confirm(
+          `"${file.name}" has the same name as a document already uploaded for this client. Upload it again anyway?`
+        );
+        if (!proceed) {
+          skipped.push(file.name);
+          continue;
+        }
+      }
+
       try {
         const res = await api.uploadFile(`/api/clients/${clientId}/company-documents/upload`, "file", file);
         collected.push({ fileName: file.name, driveWebViewLink: res.driveWebViewLink });
+        existingFileNames.add(file.name.toLowerCase());
       } catch (err) {
         errors.push(`${file.name}: ${err.message}`);
       }
     }
     setProgress(null);
     setResults(collected);
-    if (errors.length > 0) setError(errors.join("; "));
+    const messages = [];
+    if (errors.length > 0) messages.push(errors.join("; "));
+    if (skipped.length > 0) messages.push(`Skipped (duplicate, not uploaded): ${skipped.join(", ")}`);
+    setError(messages.length > 0 ? messages.join(" | ") : null);
     if (collected.length > 0) {
-      setFiles([]);
+      setFiles((prev) => prev.filter((f) => skipped.includes(f.name)));
       await loadHistory();
     }
     setUploading(false);

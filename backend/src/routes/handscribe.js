@@ -11,6 +11,7 @@ import { canAccessClient } from "../lib/clientAccess.js";
 import { uploadInvoiceToDrive, downloadDriveFile } from "../lib/googleDrive.js";
 import { applyDateFormat } from "../lib/dateUtils.js";
 import { applyClientIdentityOverride } from "../lib/clientIdentityOverride.js";
+import { resolveChecklistMatches, markChecklistDocumentUploaded } from "../lib/documentChecklist.js";
 
 const HANDSCRIBE_BASE_URL = process.env.HANDSCRIBE_BASE_URL || "http://localhost:8000";
 
@@ -488,7 +489,36 @@ handscribeRouter.post(
         createdByUid: req.uid,
       });
 
-    res.json({ id: extractionId, ...extraction, driveWebViewLink: driveFile?.webViewLink ?? null });
+    // If this file's template name matches a document this client's checklist is waiting on
+    // (e.g. template "Purchase Invoice" vs. checklist item "Purchase Invoices"), mark that
+    // checklist slot received too — the extraction already saved the file to Drive above, so
+    // there's no reason to make the user upload the same file again on the checklist page.
+    const checklistMatches = resolveChecklistMatches(client, extraction.template_name);
+    for (const match of checklistMatches) {
+      const selection = client.documentChecklistConfig?.[match.workflowKey];
+      const requiredDocuments = [...(selection?.predefinedSelected || []), ...(selection?.otherDocuments || [])];
+      try {
+        await markChecklistDocumentUploaded({
+          orgId: req.orgId,
+          clientId: req.params.clientId,
+          workflowKey: match.workflowKey,
+          requiredDocuments,
+          documentName: match.documentName,
+          fileName,
+          fileSize: fileBuffer.length,
+          mimeType: fileMimeType,
+          dataBase64: canStoreFile ? fileBuffer.toString("base64") : null,
+          driveFileId: driveFile?.id ?? null,
+          driveWebViewLink: driveFile?.webViewLink ?? null,
+          uploadedByUid: req.uid,
+          source: "extraction",
+        });
+      } catch (err) {
+        console.error(`Checklist auto-fulfill failed for client ${req.params.clientId} (${match.workflowKey}/${match.documentName}):`, err.message);
+      }
+    }
+
+    res.json({ id: extractionId, ...extraction, driveWebViewLink: driveFile?.webViewLink ?? null, checklistMatches });
   })
 );
 
