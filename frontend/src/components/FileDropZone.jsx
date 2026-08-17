@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 
 /** Click-to-browse file picker that also accepts drag-and-drop — multiple files at
  *  once, up to `maxFiles`, with a removable list of what's been picked so far. */
-export function FileDropZone({ id, accept, files, onChange, disabled, maxFiles = 10 }) {
+export function FileDropZone({ id, accept, files, onChange, disabled, maxFiles = 10, hint }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const atLimit = files.length >= maxFiles;
@@ -50,7 +50,7 @@ export function FileDropZone({ id, accept, files, onChange, disabled, maxFiles =
           <>
             <p style={{ margin: 0, fontWeight: 600 }}>Drop files here, or click to browse</p>
             <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
-              Image (JPG, PNG, WEBP) or PDF — up to {maxFiles} at once
+              {hint || `Image (JPG, PNG, WEBP) or PDF — up to ${maxFiles} at once`}
             </p>
           </>
         ) : (

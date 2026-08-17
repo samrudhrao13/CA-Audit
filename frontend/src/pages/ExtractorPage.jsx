@@ -6,6 +6,7 @@ import { HandscribeLogo } from "../components/HandscribeLogo";
 import { ExtractionGrid } from "../components/ExtractionGrid";
 import { FileDropZone } from "../components/FileDropZone";
 import { DriveFilePicker } from "../components/DriveFilePicker";
+import { ConvertToXmlCard } from "../components/ConvertToXmlCard";
 import { applyDateFormat } from "../lib/normalizeDate";
 
 const MAX_FILES = 50;
@@ -270,6 +271,8 @@ export function ExtractorPage() {
           <ExtractionGrid results={results} onFieldChange={updateResultField} />
         </div>
       )}
+
+      <ConvertToXmlCard />
     </div>
   );
 }

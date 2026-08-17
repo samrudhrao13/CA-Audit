@@ -16,6 +16,7 @@ import { documentsRouter } from "./routes/documents.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { companyDocumentsRouter } from "./routes/companyDocuments.js";
 import { handscribeRouter, handscribeTemplatesRouter, handscribeGeneralRouter } from "./routes/handscribe.js";
+import { convertRouter } from "./routes/convert.js";
 import { startScheduler } from "./lib/scheduler.js";
 
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/clients/:clientId/company-documents", companyDocumentsRouter);
 app.use("/api/handscribe/templates", handscribeTemplatesRouter);
 app.use("/api/handscribe", handscribeGeneralRouter);
 app.use("/api/clients/:clientId/handscribe", handscribeRouter);
+app.use("/api/convert", convertRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
