@@ -19,6 +19,7 @@ import { TdsWorkspacePage } from "./pages/TdsWorkspacePage";
 import { SettingsWorkflowsPage } from "./pages/SettingsWorkflowsPage";
 import { SettingsTeamPage } from "./pages/SettingsTeamPage";
 import { EmailScheduleSettingsPage } from "./pages/EmailScheduleSettingsPage";
+import { DriveSettingsPage } from "./pages/DriveSettingsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsExtractorPage } from "./pages/SettingsExtractorPage";
 import { ExtractorPage } from "./pages/ExtractorPage";
@@ -102,6 +103,14 @@ export default function App() {
           element={
             <RequireCompanyAdmin>
               <EmailScheduleSettingsPage />
+            </RequireCompanyAdmin>
+          }
+        />
+        <Route
+          path="/settings/drive"
+          element={
+            <RequireCompanyAdmin>
+              <DriveSettingsPage />
             </RequireCompanyAdmin>
           }
         />

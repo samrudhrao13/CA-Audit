@@ -12,6 +12,7 @@ import {
   WorkflowIcon,
   TeamIcon,
   MailIcon,
+  FolderIcon,
   ScanIcon,
   CatalogIcon,
   LogoutIcon,
@@ -83,6 +84,9 @@ export function DashboardLayout() {
               label="Email schedule"
               onNavigate={closeSidebar}
             />
+          )}
+          {isAdmin && (
+            <SidebarLink to="/settings/drive" icon={<FolderIcon />} label="Drive storage" onNavigate={closeSidebar} />
           )}
           {isAdmin && (
             <SidebarLink
