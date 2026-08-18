@@ -171,6 +171,32 @@ export function SettingsIcon(props) {
   );
 }
 
+export function ShieldIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 2 4 5v6c0 5 3.4 8.9 8 11 4.6-2.1 8-6 8-11V5l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </Icon>
+  );
+}
+
+export function CheckIcon(props) {
+  return (
+    <Icon {...props}>
+      <polyline points="20 6 9 17 4 12" />
+    </Icon>
+  );
+}
+
+export function ClockIcon(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </Icon>
+  );
+}
+
 export function CautionIcon(props) {
   return (
     <Icon {...props}>
