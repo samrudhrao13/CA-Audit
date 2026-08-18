@@ -6,6 +6,7 @@ import { ExtractionGrid } from "./ExtractionGrid";
 import { FileDropZone } from "./FileDropZone";
 import { DriveFilePicker } from "./DriveFilePicker";
 import { FilePreviewModal } from "./FilePreviewModal";
+import { ExtractionEditModal } from "./ExtractionEditModal";
 import { applyDateFormat } from "../lib/normalizeDate";
 
 const MAX_FILES = 50;
@@ -15,6 +16,7 @@ const MAX_FILES = 50;
  *  picks from what already exists. */
 export function HandscribeExtract({ clientId, isAdmin }) {
   const [templates, setTemplates] = useState(null);
+  const [templatesError, setTemplatesError] = useState(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [files, setFiles] = useState([]);
   const [driveFiles, setDriveFiles] = useState([]);
@@ -27,10 +29,19 @@ export function HandscribeExtract({ clientId, isAdmin }) {
   const [batchExporting, setBatchExporting] = useState(null);
   const [batchExportError, setBatchExportError] = useState(null);
   const [previewing, setPreviewing] = useState(null);
+  const [editingExtraction, setEditingExtraction] = useState(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [historyTemplateFilter, setHistoryTemplateFilter] = useState("");
-  const [historyFrom, setHistoryFrom] = useState("");
-  const [historyTo, setHistoryTo] = useState("");
+  const [availablePeriods, setAvailablePeriods] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [periodExtractions, setPeriodExtractions] = useState(null);
+  const [periodLoading, setPeriodLoading] = useState(false);
+  const [periodError, setPeriodError] = useState(null);
+  const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkFields, setBulkFields] = useState([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null);
+  const [bulkError, setBulkError] = useState(null);
 
   const totalSelected = files.length + driveFiles.length;
 
@@ -44,16 +55,69 @@ export function HandscribeExtract({ clientId, isAdmin }) {
   }
 
   async function loadTemplates() {
-    const { templates } = await api.get("/api/handscribe/templates");
-    setTemplates(templates);
-    if (templates.length > 0 && !selectedTemplateId) {
-      setSelectedTemplateId(templates[0].id);
+    setTemplatesError(null);
+    try {
+      const { templates } = await api.get("/api/handscribe/templates");
+      setTemplates(templates);
+      if (templates.length > 0 && !selectedTemplateId) {
+        setSelectedTemplateId(templates[0].id);
+      }
+    } catch (err) {
+      // Previously this whole component just silently rendered nothing on failure (e.g. the
+      // HandScribe service being unreachable) — surfacing the error instead so a broken
+      // extractor is visibly broken, not invisible.
+      setTemplatesError(err.message);
     }
   }
 
   async function loadHistory() {
     const { extractions } = await api.get(`/api/clients/${clientId}/handscribe/extractions`);
     setHistory(extractions);
+  }
+
+  async function toggleHistory() {
+    const opening = !historyExpanded;
+    setHistoryExpanded(opening);
+    if (opening) {
+      // Best-effort: drop any "Past extractions" entry whose source file was deleted directly
+      // in Google Drive outside the app, so this list never shows something that's actually
+      // gone. Only runs when the list is actually opened, not on every load.
+      try {
+        await api.post(`/api/clients/${clientId}/handscribe/extractions/reconcile`, {});
+      } catch {
+        // Non-fatal — worst case a stale entry lingers until the next time this is opened.
+      }
+      await loadHistory();
+      try {
+        const { periods } = await api.get(`/api/clients/${clientId}/handscribe/extraction-periods`);
+        setAvailablePeriods(periods);
+      } catch {
+        setAvailablePeriods([]);
+      }
+    }
+  }
+
+  // A month must be picked before anything is shown — the available options come straight from
+  // Drive (which months actually have a folder for this client), not an open-ended date range.
+  async function handlePeriodChange(period) {
+    setSelectedPeriod(period);
+    setPeriodError(null);
+    if (!period) {
+      setPeriodExtractions(null);
+      return;
+    }
+    setPeriodLoading(true);
+    try {
+      const { extractions } = await api.get(
+        `/api/clients/${clientId}/handscribe/extractions?period=${encodeURIComponent(period)}`
+      );
+      setPeriodExtractions(extractions);
+    } catch (err) {
+      setPeriodError(err.message);
+      setPeriodExtractions([]);
+    } finally {
+      setPeriodLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -159,15 +223,73 @@ export function HandscribeExtract({ clientId, isAdmin }) {
     ).values()
   );
 
-  const filteredHistory = (history || []).filter((h) => {
+  const filteredHistory = (periodExtractions || []).filter((h) => {
     if (historyTemplateFilter && h.templateId !== historyTemplateFilter) return false;
-    if (historyFrom && new Date(h.createdAt) < new Date(`${historyFrom}T00:00:00`)) return false;
-    if (historyTo && new Date(h.createdAt) > new Date(`${historyTo}T23:59:59`)) return false;
     return true;
   });
-  const historyFiltersActive = historyTemplateFilter || historyFrom || historyTo;
+  const editableHistory = filteredHistory.filter((h) => h.fields?.length > 0);
 
-  if (templates === null) return null;
+  function startBulkEdit() {
+    setBulkFields(editableHistory.map((h) => ({ id: h.id, fileName: h.fileName, fields: h.fields })));
+    setBulkError(null);
+    setBulkEditing(true);
+  }
+
+  function updateBulkField(rowIndex, fieldIndex, value) {
+    setBulkFields((prev) =>
+      prev.map((r, i) => (i === rowIndex ? { ...r, fields: r.fields.map((f, fi) => (fi === fieldIndex ? { ...f, value } : f)) } : r))
+    );
+  }
+
+  async function handleBulkSave() {
+    setBulkSaving(true);
+    setBulkError(null);
+    const errors = [];
+    for (let i = 0; i < bulkFields.length; i++) {
+      setBulkProgress({ done: i, total: bulkFields.length });
+      try {
+        await api.put(`/api/clients/${clientId}/handscribe/extractions/${bulkFields[i].id}`, { fields: bulkFields[i].fields });
+      } catch (err) {
+        errors.push(`${bulkFields[i].fileName}: ${err.message}`);
+      }
+    }
+    setBulkProgress(null);
+    setBulkSaving(false);
+    await loadHistory();
+    await handlePeriodChange(selectedPeriod);
+    if (errors.length > 0) {
+      setBulkError(errors.join("; "));
+    } else {
+      setBulkEditing(false);
+    }
+  }
+  const historyFiltersActive = Boolean(historyTemplateFilter);
+
+  if (templatesError) {
+    return (
+      <div className="card stack" style={{ gap: 8 }}>
+        <p style={{ margin: 0, fontWeight: 600 }}>Extract documents</p>
+        <p className="error-text" style={{ margin: 0 }}>Couldn't reach the extraction service: {templatesError}</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          The HandScribe service (used for OCR extraction) isn't responding — this doesn't affect the rest of the
+          app. Ask your company admin to check it's running.
+        </p>
+        <div>
+          <button type="button" className="secondary" onClick={loadTemplates}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (templates === null) {
+    return (
+      <div className="card">
+        <p className="muted" style={{ margin: 0 }}>Loading extractor...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="card stack" style={{ gap: 16 }}>
@@ -305,7 +427,7 @@ export function HandscribeExtract({ clientId, isAdmin }) {
         <div className="stack" style={{ gap: 10, paddingTop: 10, borderTop: "1px solid #e2e8f0" }}>
           <button
             type="button"
-            onClick={() => setHistoryExpanded((v) => !v)}
+            onClick={toggleHistory}
             style={{
               display: "flex",
               alignItems: "center",
@@ -331,6 +453,19 @@ export function HandscribeExtract({ clientId, isAdmin }) {
           {historyExpanded && (
             <>
           <div className="row" style={{ gap: 10, alignItems: "flex-end" }}>
+            <div className="field" style={{ flex: "1 1 200px" }}>
+              <label htmlFor="histPeriod">Month *</label>
+              <select id="histPeriod" value={selectedPeriod} onChange={(e) => handlePeriodChange(e.target.value)} required>
+                <option value="">
+                  {availablePeriods === null ? "Loading..." : "Select a month..."}
+                </option>
+                {(availablePeriods || []).map((p) => (
+                  <option key={p.period} value={p.period}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="field" style={{ flex: "1 1 160px" }}>
               <label htmlFor="histTemplateFilter">Template</label>
               <select
@@ -346,30 +481,53 @@ export function HandscribeExtract({ clientId, isAdmin }) {
                 ))}
               </select>
             </div>
-            <div className="field" style={{ flex: "1 1 130px" }}>
-              <label htmlFor="histFrom">From</label>
-              <input id="histFrom" type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: "1 1 130px" }}>
-              <label htmlFor="histTo">To</label>
-              <input id="histTo" type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} />
-            </div>
             {historyFiltersActive && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setHistoryTemplateFilter("");
-                  setHistoryFrom("");
-                  setHistoryTo("");
-                }}
-              >
+              <button type="button" className="secondary" onClick={() => setHistoryTemplateFilter("")}>
                 Clear filters
+              </button>
+            )}
+            {selectedPeriod && !bulkEditing && editableHistory.length > 1 && (
+              <button type="button" className="secondary" onClick={startBulkEdit}>
+                Edit multiple
               </button>
             )}
           </div>
 
-          {filteredHistory.length === 0 ? (
+          {!selectedPeriod ? (
+            <p className="muted" style={{ margin: 0 }}>
+              {availablePeriods && availablePeriods.length === 0
+                ? "No months with extractions in Drive yet."
+                : "Please select the month."}
+            </p>
+          ) : periodLoading ? (
+            <p className="muted" style={{ margin: 0 }}>
+              Loading...
+            </p>
+          ) : periodError ? (
+            <p className="error-text">Couldn't load that month: {periodError}</p>
+          ) : bulkEditing ? (
+            <div className="stack" style={{ gap: 10 }}>
+              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                Editing {bulkFields.length} extraction{bulkFields.length === 1 ? "" : "s"} — edit any cell, then save all
+                at once. Each row's stored Excel copy is refreshed the same way single-file editing does; the
+                documents themselves aren't re-extracted.
+              </p>
+              <ExtractionGrid results={bulkFields} onFieldChange={updateBulkField} />
+              {bulkError && <p className="error-text">{bulkError}</p>}
+              <div className="row" style={{ gap: 8 }}>
+                <button type="button" disabled={bulkSaving} onClick={handleBulkSave}>
+                  {bulkSaving
+                    ? bulkProgress
+                      ? `Saving ${bulkProgress.done + 1} of ${bulkProgress.total}...`
+                      : "Saving..."
+                    : "Save all changes"}
+                </button>
+                <button type="button" className="secondary" disabled={bulkSaving} onClick={() => setBulkEditing(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : filteredHistory.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
               No extractions match these filters.
             </p>
@@ -398,6 +556,16 @@ export function HandscribeExtract({ clientId, isAdmin }) {
                         View
                       </button>
                     )}
+                    {h.fields?.length > 0 && (
+                      <button type="button" className="link-btn" onClick={() => setEditingExtraction(h)}>
+                        Edit
+                      </button>
+                    )}
+                    {h.excelDriveWebViewLink && (
+                      <a href={h.excelDriveWebViewLink} target="_blank" rel="noreferrer">
+                        Excel
+                      </a>
+                    )}
                   </span>
                 </li>
               ))}
@@ -414,6 +582,18 @@ export function HandscribeExtract({ clientId, isAdmin }) {
           fileName={previewing.fileName}
           driveWebViewLink={previewing.driveWebViewLink}
           onClose={() => setPreviewing(null)}
+        />
+      )}
+
+      {editingExtraction && (
+        <ExtractionEditModal
+          clientId={clientId}
+          extraction={editingExtraction}
+          onClose={() => setEditingExtraction(null)}
+          onSaved={async () => {
+            await loadHistory();
+            await handlePeriodChange(selectedPeriod);
+          }}
         />
       )}
     </div>
