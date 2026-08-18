@@ -4,42 +4,47 @@ import { api } from "../lib/api";
 import { useUserProfile } from "../context/UserProfileContext";
 import { ProgressBar } from "../components/ProgressBar";
 import { FileDropZone } from "../components/FileDropZone";
-import { FilePreviewModal } from "../components/FilePreviewModal";
+import { ChecklistFilesModal } from "../components/ChecklistFilesModal";
 
 // Must match backend/src/routes/documents.js's CHALLAN_WORKFLOWS.
 const CHALLAN_WORKFLOWS = ["TDS", "GST"];
+// A slot like "Purchase Invoices" can hold many files for a period (dozens of individual
+// invoices), so uploads are additive, not one-file-per-slot.
+const MAX_FILES_PER_DOCUMENT = 50;
 
 function DocumentRow({ clientId, workflowKey, period, doc, readOnly, onUploaded }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
-  const [previewing, setPreviewing] = useState(false);
+  const [viewingFiles, setViewingFiles] = useState(false);
 
   async function handleFilesChanged(newFiles) {
-    const file = newFiles[newFiles.length - 1];
-    if (!file) {
+    const toUpload = newFiles.filter((f) => !files.includes(f));
+    if (toUpload.length === 0) {
       setFiles(newFiles);
       return;
-    }
-    if (doc.uploaded && doc.fileName) {
-      const proceed = confirm(`"${doc.name}" already has a file uploaded (${doc.fileName}). Replace it with "${file.name}"?`);
-      if (!proceed) return;
     }
     setFiles(newFiles);
     setUploading(true);
     setError(null);
-    try {
-      await api.uploadFile(`/api/documents/client/${clientId}/${workflowKey}/upload`, "file", file, {
-        documentName: doc.name,
-        period,
-      });
-      setFiles([]);
-      await onUploaded();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
+    const errors = [];
+    for (let i = 0; i < toUpload.length; i++) {
+      setProgress({ done: i, total: toUpload.length });
+      try {
+        await api.uploadFile(`/api/documents/client/${clientId}/${workflowKey}/upload`, "file", toUpload[i], {
+          documentName: doc.name,
+          period,
+        });
+      } catch (err) {
+        errors.push(`${toUpload[i].name}: ${err.message}`);
+      }
     }
+    setProgress(null);
+    setFiles([]);
+    if (errors.length > 0) setError(errors.join("; "));
+    await onUploaded();
+    setUploading(false);
   }
 
   return (
@@ -48,20 +53,26 @@ function DocumentRow({ clientId, workflowKey, period, doc, readOnly, onUploaded 
         <p style={{ margin: 0, fontWeight: 600 }}>
           {doc.uploaded ? "✅" : "⬜"} {doc.name}
         </p>
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-          {doc.uploaded && doc.hasFile && (
-            <button type="button" className="link-btn" onClick={() => setPreviewing(true)}>
-              View
-            </button>
-          )}
-        </div>
+        {doc.uploaded && (
+          <button type="button" className="link-btn" style={{ flexShrink: 0 }} onClick={() => setViewingFiles(true)}>
+            View documents{doc.count ? ` (${doc.count})` : ""}
+          </button>
+        )}
       </div>
 
       {doc.uploaded && doc.fileName && (
         <p className="muted" style={{ margin: "0 0 10px", fontSize: 13 }}>
-          {doc.fileName}
-          {doc.uploadedAt && ` — uploaded ${new Date(doc.uploadedAt).toLocaleString()}`}
-          {doc.source === "extraction" && " — via Extract documents"}
+          {doc.count > 1 ? (
+            <>
+              {doc.count} documents uploaded — most recent {new Date(doc.uploadedAt).toLocaleString()}
+            </>
+          ) : (
+            <>
+              {doc.fileName}
+              {doc.uploadedAt && ` — uploaded ${new Date(doc.uploadedAt).toLocaleString()}`}
+              {doc.source === "extraction" && " — via Extract documents"}
+            </>
+          )}
         </p>
       )}
 
@@ -72,11 +83,12 @@ function DocumentRow({ clientId, workflowKey, period, doc, readOnly, onUploaded 
             files={files}
             onChange={handleFilesChanged}
             disabled={uploading}
-            maxFiles={1}
+            maxFiles={MAX_FILES_PER_DOCUMENT}
+            hint={`Image (JPG, PNG, WEBP) or PDF — add as many as you have, up to ${MAX_FILES_PER_DOCUMENT} at once`}
           />
           {uploading && (
             <p className="muted" style={{ fontSize: 13, margin: "6px 0 0" }}>
-              Uploading...
+              {progress ? `Uploading ${progress.done + 1} of ${progress.total}...` : "Uploading..."}
             </p>
           )}
           {error && (
@@ -87,12 +99,13 @@ function DocumentRow({ clientId, workflowKey, period, doc, readOnly, onUploaded 
         </>
       )}
 
-      {previewing && (
-        <FilePreviewModal
-          url={`/api/documents/client/${clientId}/${workflowKey}/file?documentName=${encodeURIComponent(doc.name)}&period=${period}`}
-          fileName={doc.fileName || doc.name}
-          driveWebViewLink={doc.driveWebViewLink}
-          onClose={() => setPreviewing(false)}
+      {viewingFiles && (
+        <ChecklistFilesModal
+          clientId={clientId}
+          workflowKey={workflowKey}
+          documentName={doc.name}
+          period={period}
+          onClose={() => setViewingFiles(false)}
         />
       )}
     </div>
