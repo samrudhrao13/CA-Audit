@@ -78,19 +78,24 @@ still run on your own machine.
 
 Reuses the **same** Firebase service account from step 1.5 — no second credential to manage.
 
-1. In [Google Cloud Console](https://console.cloud.google.com), on the same project as your
-   Firebase project, enable the **Google Drive API**.
-2. In Google Drive: left sidebar → **Shared drives** → **Create a shared drive** (must be a
-   *Shared* Drive, not a folder in "My Drive" — service accounts have zero storage quota
-   outside one, so real file uploads fail with `Service Accounts do not have storage quota`
-   otherwise).
-3. Open it → **Manage members** → add the service account's `client_email` (from the
-   downloaded JSON, looks like `firebase-adminsdk-xxxxx@<project-id>.iam.gserviceaccount.com`)
-   with role **Content Manager**.
-4. Copy the Shared Drive's ID from its URL (`drive.google.com/drive/folders/<ID>`) — you'll put
-   it in `backend/.env` as `GOOGLE_DRIVE_ROOT_FOLDER_ID` in step 5.
+Unlike the Gmail app password above, this isn't a single `.env` value: **each company
+configures its own Drive destination** from inside the app (Settings → Drive storage, company
+admin only), so every firm's invoices and documents land in a Drive folder only they control —
+none of it is merged into one shared platform folder.
 
-Left unset, every Drive-related feature just no-ops silently — everything else still works.
+1. In [Google Cloud Console](https://console.cloud.google.com), on the same project as your
+   Firebase project, enable the **Google Drive API** (one-time, project-wide).
+2. Each company then does, from Settings → Drive storage in the app:
+   - Create a **Shared Drive** in Google Drive (left sidebar → "Shared drives" → "New") — not a
+     folder in "My Drive". Service accounts have zero storage quota outside a Shared Drive, so
+     uploads fail with `Service Accounts do not have storage quota` otherwise.
+   - Share it with the service account email shown on that settings page (Manage members →
+     role **Content Manager**).
+   - Paste the Shared Drive's link into the settings page — the folder ID is parsed out of it
+     automatically and saved for that company only.
+
+Left unconfigured for a given company, Drive sync just no-ops silently for them — everything
+else still works.
 
 ## 4. Set up AI document extraction (optional)
 
@@ -116,7 +121,6 @@ will show a "couldn't reach the extraction service" error.
 #   GMAIL_USER=<from step 2>
 #   GMAIL_APP_PASSWORD=<from step 2>
 #   HANDSCRIBE_BASE_URL=http://localhost:8000
-#   GOOGLE_DRIVE_ROOT_FOLDER_ID=<from step 3, optional>
 cd backend
 npm install
 node -e "console.log('base64:' + require('crypto').randomBytes(32).toString('base64'))"
