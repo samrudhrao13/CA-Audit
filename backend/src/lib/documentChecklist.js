@@ -9,10 +9,6 @@ function checklistRef(orgId, clientId, workflowKey, period) {
   return clientRef(orgId, clientId).collection("documentChecklist").doc(`${workflowKey}_${period}`);
 }
 
-function fileDocId(documentName) {
-  return Buffer.from(documentName).toString("base64url");
-}
-
 // Crude singularize so checklist item names ("Purchase Invoices") line up with HandScribe
 // template names ("Purchase Invoice") without requiring the two systems to agree on exact text.
 function normalizeDocName(name) {
@@ -37,8 +33,28 @@ export function resolveChecklistMatches(client, candidateName) {
   return matches;
 }
 
+/** Every file recorded against one checklist document slot (a client can have many "Purchase
+ *  Invoices" for a period, not just one) — newest first, without the (potentially large) file
+ *  bytes, so this stays cheap to call even once a slot has dozens of files in it. */
+export async function listChecklistDocumentFiles(orgId, clientId, workflowKey, period, documentName) {
+  // Sorted in JS rather than via .orderBy() — a compound where+orderBy on different fields
+  // needs a composite Firestore index, which doesn't exist for this collection and isn't
+  // worth requiring just to sort what's realistically at most a few dozen files.
+  const snap = await checklistRef(orgId, clientId, workflowKey, period)
+    .collection("files")
+    .where("documentName", "==", documentName)
+    .get();
+  return snap.docs
+    .map((d) => {
+      const { dataBase64, ...rest } = d.data();
+      return { id: d.id, hasFile: !!dataBase64, ...rest };
+    })
+    .sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || ""));
+}
+
 /** Shared by manual checklist uploads (routes/documents.js) and extraction auto-fulfillment
- *  (routes/handscribe.js) — records a file against one checklist document slot and advances
+ *  (routes/handscribe.js) — adds a file to one checklist document slot (a slot can hold many
+ *  files — a client might have 50 purchase invoices for a month, not just one) and advances
  *  progress the same way regardless of which path triggered it. */
 export async function markChecklistDocumentUploaded({
   orgId,
@@ -57,15 +73,23 @@ export async function markChecklistDocumentUploaded({
   source = "manual",
 }) {
   const ref = checklistRef(orgId, clientId, workflowKey, period);
+  const uploadedAt = new Date().toISOString();
 
-  await ref.collection("files").doc(fileDocId(documentName)).set({
+  await ref.collection("files").add({
     documentName,
     fileName,
+    fileSize: fileSize ?? null,
     mimeType: mimeType ?? null,
     dataBase64: dataBase64 ?? null,
     driveFileId: driveFileId ?? null,
     driveWebViewLink: driveWebViewLink ?? null,
+    uploadedAt,
+    uploadedByUid: uploadedByUid ?? null,
+    source,
   });
+
+  const filesSnap = await ref.collection("files").where("documentName", "==", documentName).count().get();
+  const fileCount = filesSnap.data().count;
 
   await ref.set(
     {
@@ -74,10 +98,10 @@ export async function markChecklistDocumentUploaded({
       documents: {
         [documentName]: {
           uploaded: true,
+          count: fileCount,
           fileName,
-          fileSize: fileSize ?? null,
           hasFile: !!dataBase64,
-          uploadedAt: new Date().toISOString(),
+          uploadedAt,
           uploadedByUid: uploadedByUid ?? null,
           driveWebViewLink: driveWebViewLink ?? null,
           source,
@@ -102,5 +126,5 @@ export async function markChecklistDocumentUploaded({
     });
   }
 
-  return { allUploaded };
+  return { allUploaded, fileCount };
 }
