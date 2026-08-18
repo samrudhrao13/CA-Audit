@@ -3,6 +3,9 @@ import { RequireAuth } from "./components/RequireAuth";
 import { RequireCompanyAccess, RequireCompanyAdmin, RequirePlatformAdmin } from "./components/RouteGuards";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { PlatformLayout } from "./components/PlatformLayout";
+import { LandingPage } from "./pages/LandingPage";
+import { TermsPage } from "./pages/TermsPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { PlatformAdminPage } from "./pages/PlatformAdminPage";
@@ -25,7 +28,9 @@ import { DocumentChecklistPage } from "./pages/DocumentChecklistPage";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route
