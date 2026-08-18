@@ -7,8 +7,8 @@ import { requireCompanyMember } from "../middleware/profile.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessWorkflow } from "../lib/clientAccess.js";
 import { currentPeriod, setProgressStage, getClientProgress } from "../lib/workflowProgress.js";
-import { uploadCompanyDocumentToDrive } from "../lib/googleDrive.js";
-import { markChecklistDocumentUploaded } from "../lib/documentChecklist.js";
+import { uploadCompanyDocumentToDrive, uploadChecklistDocumentToDrive } from "../lib/googleDrive.js";
+import { markChecklistDocumentUploaded, listChecklistDocumentFiles } from "../lib/documentChecklist.js";
 import { sendMail } from "../lib/mailer.js";
 import { getOrgMailConfig } from "../lib/orgMailConfig.js";
 import { formatPeriodLabel } from "../lib/dateUtils.js";
@@ -55,10 +55,6 @@ function clientRef(orgId, clientId) {
 
 function checklistRef(orgId, clientId, workflowKey, period) {
   return clientRef(orgId, clientId).collection("documentChecklist").doc(`${workflowKey}_${period}`);
-}
-
-function fileDocId(documentName) {
-  return Buffer.from(documentName).toString("base64url");
 }
 
 async function loadClientAndCatalog(req, res, workflowKey) {
@@ -143,12 +139,12 @@ documentsRouter.post(
     const ext = extIndex >= 0 ? req.file.originalname.slice(extIndex) : "";
     const uploadFileName = isChallan ? `Challan_${req.params.workflowKey}_${periodLabel}${ext}` : req.file.originalname;
 
-    // Best-effort mirror into Drive (company folder / "Company Documents") — never blocks
-    // the checklist upload itself if Drive isn't configured or a call to it fails. Separate
-    // folder from invoices — these are compliance documents, not invoices.
+    // Best-effort mirror into Drive, filed the way an auditor actually organizes paperwork:
+    // <client> / <period> / <workflow> / <document type> — never blocks the checklist upload
+    // itself if Drive isn't configured or a call to it fails.
     let driveFile = null;
     try {
-      driveFile = await uploadCompanyDocumentToDrive(req.orgId, req.params.clientId, {
+      driveFile = await uploadChecklistDocumentToDrive(req.orgId, req.params.clientId, period, documentName, {
         fileName: uploadFileName,
         mimeType: req.file.mimetype,
         buffer: req.file.buffer,
@@ -213,20 +209,33 @@ documentsRouter.post(
   })
 );
 
+/** Every file uploaded against one checklist document slot — a slot can hold many (a client
+ *  might have 50 purchase invoices for a month), so this is a list, not a single file. */
 documentsRouter.get(
-  "/client/:clientId/:workflowKey/file",
+  "/client/:clientId/:workflowKey/files",
   asyncHandler(async (req, res) => {
     const loaded = await loadClientAndCatalog(req, res, req.params.workflowKey);
     if (!loaded) return;
 
     const documentName = String(req.query.documentName || "");
     const period = String(req.query.period || currentPeriod());
+    const files = await listChecklistDocumentFiles(req.orgId, req.params.clientId, req.params.workflowKey, period, documentName);
+    res.json({ files });
+  })
+);
 
+documentsRouter.get(
+  "/client/:clientId/:workflowKey/files/:fileId",
+  asyncHandler(async (req, res) => {
+    const loaded = await loadClientAndCatalog(req, res, req.params.workflowKey);
+    if (!loaded) return;
+
+    const period = String(req.query.period || currentPeriod());
     const fileSnap = await checklistRef(req.orgId, req.params.clientId, req.params.workflowKey, period)
       .collection("files")
-      .doc(fileDocId(documentName))
+      .doc(req.params.fileId)
       .get();
-    if (!fileSnap.exists) {
+    if (!fileSnap.exists || !fileSnap.data().dataBase64) {
       return res.status(404).json({ error: "File not found" });
     }
 

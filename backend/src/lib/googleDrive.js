@@ -1,25 +1,30 @@
 import { Readable } from "node:stream";
 import { google } from "googleapis";
 import { db, serviceAccount } from "./firebaseAdmin.js";
+import { getOrgDriveRootFolderId } from "./orgDriveConfig.js";
 
 /**
  * Invoice storage in Google Drive, organized as:
- *   <root folder> / <company name> / <YYYY - Month> / <invoice files>
+ *   <org's configured root folder> / <company name> / <YYYY - Month> / <invoice files>
  *
  * Reuses the same service account as Firebase Admin (see firebaseAdmin.js) rather than a
- * second credential — it just needs the Drive API enabled on that project and the root
- * folder shared with the service account's client_email as an editor.
+ * second credential — it just needs the Drive API enabled on that project.
  *
- * Company and month folders are created lazily (on first invoice of that company/month) and
+ * The root folder is **per-organization**, not a single shared platform-wide folder — every
+ * company admin configures their own Drive destination (see routes/driveSettings.js), and that
+ * folder must be shared with the service account's client_email as an editor/Content Manager.
+ * This keeps every company's documents fully separated in Drive, matching the existing
+ * per-org data isolation everywhere else in the app.
+ *
+ * Client and month folders are created lazily (on first invoice of that company/month) and
  * their IDs are cached on the client's Firestore doc (`driveFolderId`, `driveMonthFolders`)
  * so normal uploads don't re-query Drive's folder listing every time.
  *
- * Every export here is best-effort: if GOOGLE_DRIVE_ROOT_FOLDER_ID isn't set, or a Drive call
+ * Every export here is best-effort: if this org hasn't configured a Drive root, or a Drive call
  * fails, callers get `null` back rather than a thrown error — Drive sync mirrors the existing
  * Firestore-based file storage, it never gates it.
  */
-const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "";
-export const driveConfigured = Boolean(ROOT_FOLDER_ID);
+export const serviceAccountEmail = serviceAccount.client_email;
 
 let driveClient = null;
 function getDrive() {
@@ -80,14 +85,15 @@ function clientRef(orgId, clientId) {
  *  client is created, and again lazily here as a fallback for clients that predate Drive
  *  sync, or if the eager create failed transiently. */
 export async function ensureCompanyFolder(orgId, clientId) {
-  if (!driveConfigured) return null;
+  const rootFolderId = await getOrgDriveRootFolderId(orgId);
+  if (!rootFolderId) return null;
   const ref = clientRef(orgId, clientId);
   const snap = await ref.get();
   if (!snap.exists) return null;
   const client = snap.data();
   if (client.driveFolderId) return client.driveFolderId;
 
-  const folderId = (await findChildFolder(ROOT_FOLDER_ID, client.name)) || (await createFolder(ROOT_FOLDER_ID, client.name));
+  const folderId = (await findChildFolder(rootFolderId, client.name)) || (await createFolder(rootFolderId, client.name));
   await ref.update({ driveFolderId: folderId });
   return folderId;
 }
@@ -96,7 +102,6 @@ export async function ensureCompanyFolder(orgId, clientId) {
  *  named "YYYY - Month" — e.g. "2026 - August". A new one appears automatically the first
  *  time an invoice is uploaded after the calendar rolls into a new month. */
 export async function ensureMonthFolder(orgId, clientId, date = new Date()) {
-  if (!driveConfigured) return null;
   const ref = clientRef(orgId, clientId);
   const monthKey = monthKeyOf(date);
 
@@ -116,12 +121,10 @@ export async function ensureMonthFolder(orgId, clientId, date = new Date()) {
 }
 
 /** Creates (or finds) the "Company Documents" folder inside a client's company folder — a
- *  separate bucket, sitting alongside the invoice month folders, for the GST/TDS workflow
- *  document checklist (bank statements, registers, etc.), which aren't invoices and shouldn't
- *  get mixed into the monthly invoice folders. Not further split by month/period — just one
- *  flat folder per client. */
+ *  separate bucket, sitting alongside the invoice month folders, for free-form company
+ *  documents that aren't tied to a workflow's fixed checklist (see routes/companyDocuments.js).
+ *  Not further split by month/period — just one flat folder per client. */
 export async function ensureCompanyDocumentsFolder(orgId, clientId) {
-  if (!driveConfigured) return null;
   const ref = clientRef(orgId, clientId);
   const snap = await ref.get();
   if (!snap.exists) return null;
@@ -135,6 +138,47 @@ export async function ensureCompanyDocumentsFolder(orgId, clientId) {
     (await findChildFolder(companyFolderId, "Company Documents")) || (await createFolder(companyFolderId, "Company Documents"));
   await ref.update({ driveCompanyDocumentsFolderId: folderId });
   return folderId;
+}
+
+/** Creates (or finds) the folder a document-checklist file belongs in — <client> /
+ *  <period, "YYYY - Month"> / "Documents" / <document type, e.g. "Purchase Invoices">. One
+ *  shared "Documents" folder per period, not split per workflow: the same Purchase/Sales
+ *  invoice etc. is often required by more than one enrolled workflow (GST and TDS both, for
+ *  the same client), and it's the same physical document either way, so it's stored once
+ *  here rather than duplicated once per workflow. Sibling "GST"/"TDS" folders exist alongside
+ *  "Documents" at the same level for whatever workflow-specific material (filed returns,
+ *  challans, ...) ends up needing its own place later — not created by this function.
+ *  Used for every checklist upload: manual (routes/documents.js), challan, and extraction
+ *  auto-fulfillment (routes/handscribe.js) alike. `period` is "YYYY-MM". Cached on the client
+ *  doc under `driveChecklistFolders`, keyed by period+document name, so repeat uploads into
+ *  the same slot don't re-walk the folder tree every time. */
+export async function ensureChecklistDocumentFolder(orgId, clientId, period, documentName) {
+  const ref = clientRef(orgId, clientId);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const client = snap.data();
+
+  const cacheKey = `${period}__${documentName}`;
+  const cached = client.driveChecklistFolders?.[cacheKey];
+  if (cached) return cached;
+
+  const companyFolderId = client.driveFolderId || (await ensureCompanyFolder(orgId, clientId));
+  if (!companyFolderId) return null;
+
+  const periodName = monthLabelFromKey(period);
+  const periodFolderId =
+    (await findChildFolder(companyFolderId, periodName)) || (await createFolder(companyFolderId, periodName));
+
+  const documentsFolderId =
+    (await findChildFolder(periodFolderId, "Documents")) || (await createFolder(periodFolderId, "Documents"));
+
+  const docFolderId =
+    (await findChildFolder(documentsFolderId, documentName)) || (await createFolder(documentsFolderId, documentName));
+
+  // Plain object merge (not a dotted update path) so a document name containing "." — a
+  // free-form "Other documents" entry could have one — can't be misread as a nested path.
+  await ref.set({ driveChecklistFolders: { [cacheKey]: docFolderId } }, { merge: true });
+  return docFolderId;
 }
 
 async function createDriveFile(folderId, fileName, mimeType, buffer) {
@@ -169,6 +213,7 @@ async function uploadWithSelfHeal(orgId, clientId, folderId, { fileName, mimeTyp
       driveFolderId: null,
       driveMonthFolders: null,
       driveCompanyDocumentsFolderId: null,
+      driveChecklistFolders: null,
     });
     const freshFolderId = await resolveFolderId();
     if (!freshFolderId) return null;
@@ -195,10 +240,19 @@ export async function uploadCompanyDocumentToDrive(orgId, clientId, { fileName, 
   );
 }
 
+/** Uploads one document-checklist file into its <period>/<workflow>/<document type> folder
+ *  (see ensureChecklistDocumentFolder). Returns `{ id, webViewLink }` on success, or `null` if
+ *  Drive isn't configured/reachable. */
+export async function uploadChecklistDocumentToDrive(orgId, clientId, period, documentName, { fileName, mimeType, buffer }) {
+  const folderId = await ensureChecklistDocumentFolder(orgId, clientId, period, documentName);
+  return uploadWithSelfHeal(orgId, clientId, folderId, { fileName, mimeType, buffer }, () =>
+    ensureChecklistDocumentFolder(orgId, clientId, period, documentName)
+  );
+}
+
 /** This client's month folders that already exist in Drive (from cache on the client doc —
  *  no live Drive query needed), newest first, for a "pick an existing invoice" browser. */
 export async function listMonthFolders(orgId, clientId) {
-  if (!driveConfigured) return [];
   const snap = await clientRef(orgId, clientId).get();
   if (!snap.exists) return [];
   const map = snap.data().driveMonthFolders || {};

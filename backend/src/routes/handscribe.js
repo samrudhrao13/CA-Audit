@@ -8,10 +8,11 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireCompanyMember, requireRole } from "../middleware/profile.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { canAccessClient } from "../lib/clientAccess.js";
-import { uploadInvoiceToDrive, downloadDriveFile } from "../lib/googleDrive.js";
+import { uploadInvoiceToDrive, uploadChecklistDocumentToDrive, downloadDriveFile } from "../lib/googleDrive.js";
 import { applyDateFormat } from "../lib/dateUtils.js";
 import { applyClientIdentityOverride } from "../lib/clientIdentityOverride.js";
 import { resolveChecklistMatches, markChecklistDocumentUploaded } from "../lib/documentChecklist.js";
+import { currentPeriod } from "../lib/workflowProgress.js";
 
 const HANDSCRIBE_BASE_URL = process.env.HANDSCRIBE_BASE_URL || "http://localhost:8000";
 
@@ -452,13 +453,55 @@ handscribeRouter.post(
     const extractionId = randomBytes(12).toString("hex");
     const canStoreFile = fileBuffer.length <= MAX_STORED_FILE_BYTES;
 
-    // A Drive-sourced file is already up there — no need to re-upload it. A fresh upload
-    // gets mirrored into Drive (company folder / this month's folder) best-effort, same as
-    // before — never blocks the extraction itself if Drive isn't configured or the call fails.
+    // If this file's template name matches a document this client's checklist is waiting on
+    // (e.g. template "Purchase Invoice" vs. checklist item "Purchase Invoices"), it gets filed
+    // straight into that checklist slot's own Drive folder (<client>/<period>/<workflow>/
+    // <document type>) and marked received — same place a manual checklist upload would land,
+    // so there's no reason to make the user upload the same file again on the checklist page.
+    // Anything that doesn't match a checklist item falls back to the flat invoice/month folder,
+    // same as before.
+    const checklistMatches = resolveChecklistMatches(client, extraction.template_name);
+    const period = currentPeriod();
+
     let driveFile = sourcedFromDrive
       ? { id: req.body.driveFileId, webViewLink: sourcedFromDrive.webViewLink }
       : null;
-    if (!sourcedFromDrive) {
+
+    // Best-effort — never blocks the extraction itself if Drive isn't configured or a call
+    // fails. Uploaded once per distinct document name, not once per matched workflow — GST and
+    // TDS often share the exact same checklist item (e.g. both want "Purchase Invoices"), and
+    // it's the same physical document either way, so every match with that document name reuses
+    // the one upload instead of duplicating it in Drive. A file already sourced from Drive
+    // (picked from an existing month folder, not freshly uploaded) isn't re-uploaded — the same
+    // existing Drive reference is reused for every match.
+    const checklistDriveFiles = [];
+    if (checklistMatches.length > 0) {
+      const uploadedByDocName = new Map();
+      for (const match of checklistMatches) {
+        if (sourcedFromDrive) {
+          checklistDriveFiles.push({ match, driveFile });
+          continue;
+        }
+        if (!uploadedByDocName.has(match.documentName)) {
+          try {
+            const uploaded = await uploadChecklistDocumentToDrive(req.orgId, req.params.clientId, period, match.documentName, {
+              fileName,
+              mimeType: fileMimeType,
+              buffer: fileBuffer,
+            });
+            uploadedByDocName.set(match.documentName, uploaded);
+          } catch (err) {
+            console.error(`Drive: failed to upload checklist document for client ${req.params.clientId} (${match.documentName}):`, err.message);
+            uploadedByDocName.set(match.documentName, null);
+          }
+        }
+        checklistDriveFiles.push({ match, driveFile: uploadedByDocName.get(match.documentName) });
+      }
+      // The extraction record itself (and the "Past extractions" list) shows one representative
+      // link — the first matched document's copy (unless this is a Drive-sourced file, which
+      // already has its own single reference set above).
+      if (!sourcedFromDrive) driveFile = checklistDriveFiles[0]?.driveFile ?? null;
+    } else if (!sourcedFromDrive) {
       try {
         driveFile = await uploadInvoiceToDrive(req.orgId, req.params.clientId, {
           fileName,
@@ -489,12 +532,7 @@ handscribeRouter.post(
         createdByUid: req.uid,
       });
 
-    // If this file's template name matches a document this client's checklist is waiting on
-    // (e.g. template "Purchase Invoice" vs. checklist item "Purchase Invoices"), mark that
-    // checklist slot received too — the extraction already saved the file to Drive above, so
-    // there's no reason to make the user upload the same file again on the checklist page.
-    const checklistMatches = resolveChecklistMatches(client, extraction.template_name);
-    for (const match of checklistMatches) {
+    for (const { match, driveFile: matchDriveFile } of checklistDriveFiles) {
       const selection = client.documentChecklistConfig?.[match.workflowKey];
       const requiredDocuments = [...(selection?.predefinedSelected || []), ...(selection?.otherDocuments || [])];
       try {
@@ -504,12 +542,13 @@ handscribeRouter.post(
           workflowKey: match.workflowKey,
           requiredDocuments,
           documentName: match.documentName,
+          period,
           fileName,
           fileSize: fileBuffer.length,
           mimeType: fileMimeType,
           dataBase64: canStoreFile ? fileBuffer.toString("base64") : null,
-          driveFileId: driveFile?.id ?? null,
-          driveWebViewLink: driveFile?.webViewLink ?? null,
+          driveFileId: matchDriveFile?.id ?? null,
+          driveWebViewLink: matchDriveFile?.webViewLink ?? null,
           uploadedByUid: req.uid,
           source: "extraction",
         });
