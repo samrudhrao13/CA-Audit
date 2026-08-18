@@ -776,3 +776,1610 @@ tbody tr:hover {
     padding: 20px 16px;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Login page                                                              */
+/* ---------------------------------------------------------------------- */
+
+.login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Just enough extra top padding to clear the small circular back button. */
+  padding: clamp(56px, 8vw, 68px) clamp(16px, 4vw, 24px) clamp(20px, 4vw, 36px);
+  background: radial-gradient(ellipse at top, #0f2a4d 0%, var(--sidebar-bg) 45%, var(--sidebar-bg-alt) 100%);
+}
+
+.login-back-link {
+  position: fixed;
+  z-index: 3;
+  top: 18px;
+  left: 18px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #cdd7ec;
+  text-decoration: none;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.login-back-link svg {
+  transition: transform 180ms ease;
+}
+
+.login-back-link:hover {
+  background: rgba(20, 184, 166, 0.16);
+  border-color: rgba(94, 234, 212, 0.4);
+  color: white;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.login-back-link:hover svg {
+  transform: translateX(-3px);
+}
+
+/* A faint ledger/spreadsheet grid -- a nod to the actual work (books, ledgers, reconciliation)
+   this platform is for, rather than a generic gradient with no connection to the product. Fades
+   out toward the edges so it reads as texture, not a literal grid. */
+.login-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: linear-gradient(rgba(148, 197, 216, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 197, 216, 0.07) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, black 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, black 0%, transparent 78%);
+  pointer-events: none;
+}
+
+.login-float-icons {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-float-icon {
+  position: absolute;
+  animation-name: loginIconDrift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.login-float-icon svg {
+  display: block;
+}
+
+@keyframes loginIconDrift {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -20px) rotate(-5deg);
+  }
+  50% {
+    transform: translate(-6px, -38px) rotate(7deg);
+  }
+  75% {
+    transform: translate(-14px, -14px) rotate(-3deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-float-icon {
+    animation: none;
+  }
+}
+
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.login-blob-1 {
+  width: 480px;
+  height: 480px;
+  top: -140px;
+  left: -120px;
+  background: radial-gradient(circle, #14b8a6 0%, transparent 70%);
+  animation: loginBlobFloat 16s ease-in-out infinite;
+}
+
+.login-blob-2 {
+  width: 420px;
+  height: 420px;
+  bottom: -160px;
+  right: -100px;
+  background: radial-gradient(circle, #2563eb 0%, transparent 70%);
+  animation: loginBlobFloat 20s ease-in-out infinite reverse;
+}
+
+.login-blob-3 {
+  width: 320px;
+  height: 320px;
+  top: 40%;
+  left: 55%;
+  background: radial-gradient(circle, #f59e0b 0%, transparent 72%);
+  opacity: 0.28;
+  animation: loginBlobFloat 24s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+@keyframes loginBlobFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(40px, -30px) scale(1.08);
+  }
+  66% {
+    transform: translate(-30px, 25px) scale(0.95);
+  }
+}
+
+/* Sits between the pitch and the sign-in circle, in the gap "space-between" leaves --
+   a vertical workflow line with pulses traveling along it, echoing the product's own
+   step-tracker (documents -> filed -> billed) instead of leaving that space empty. */
+.login-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  height: 380px;
+  gap: 0;
+}
+
+.login-connector-line {
+  position: relative;
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(94, 234, 212, 0.45) 12%,
+    rgba(96, 165, 250, 0.45) 50%,
+    rgba(94, 234, 212, 0.45) 88%,
+    transparent
+  );
+}
+
+.login-connector-node {
+  position: absolute;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgba(15, 42, 77, 0.9);
+}
+
+.login-connector-pulse {
+  position: absolute;
+  left: 50%;
+  top: 0%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #5eead4;
+  box-shadow: 0 0 12px 3px rgba(94, 234, 212, 0.85);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: loginPulseTravel 4s ease-in-out infinite;
+}
+
+@keyframes loginPulseTravel {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-connector-pulse {
+    animation: none;
+    opacity: 0.7;
+    top: 50% !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  /* Only makes sense as a bridge between two side-by-side columns. */
+  .login-connector {
+    display: none;
+  }
+}
+
+.login-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+  max-width: 1320px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.login-brand {
+  flex: 1 1 420px;
+  max-width: 560px;
+  color: #e7ecf6;
+  animation: loginFadeUp 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 13px;
+  font-weight: 600;
+  color: #a9dcd4;
+  margin-bottom: 20px;
+}
+
+.login-brand-mark-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.18);
+}
+
+.login-brand h1 {
+  font-size: clamp(24px, 2.6vw + 14px, 36px);
+  line-height: 1.15;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.login-brand h1 span {
+  background: linear-gradient(90deg, #5eead4, #60a5fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.login-brand-desc {
+  font-size: clamp(13.5px, 0.6vw + 12px, 15px);
+  line-height: 1.6;
+  color: #b7c3da;
+  margin: 0 0 22px;
+}
+
+.login-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.login-feature-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.14);
+  border: 1px solid rgba(20, 184, 166, 0.3);
+  color: #5eead4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-feature-text strong {
+  display: block;
+  font-size: 14px;
+  color: white;
+  margin-bottom: 2px;
+}
+
+.login-feature-text span {
+  font-size: 13px;
+  color: #97a5c0;
+}
+
+.login-circle-wrap {
+  position: relative;
+  flex-shrink: 0;
+  animation: loginPopIn 750ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+.login-circle-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -18px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #14b8a6, #60a5fa, #f59e0b, #14b8a6);
+  opacity: 0.35;
+  filter: blur(18px);
+  animation: loginRingSpin 10s linear infinite;
+}
+
+.login-circle {
+  position: relative;
+  width: clamp(360px, 30vw + 190px, 440px);
+  height: clamp(360px, 30vw + 190px, 440px);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-circle-inner {
+  width: 100%;
+  max-width: 300px;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-circle-inner h2 {
+  margin: 0 0 2px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.login-circle-inner .field label {
+  font-size: 12px;
+}
+
+.login-footnote {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+@keyframes loginRingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loginFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loginPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-blob,
+  .login-circle-wrap::before {
+    animation: none;
+  }
+  .login-brand,
+  .login-circle-wrap {
+    animation: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  /* space-between only makes sense with two side-by-side columns -- once there's not enough
+     room and they wrap into a single stacked column, it would shove each one to the left edge
+     instead. 1100px comfortably covers the width where wrapping actually kicks in. */
+  .login-content {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 860px) {
+  .login-content {
+    gap: 40px;
+  }
+  .login-brand {
+    text-align: center;
+    max-width: 480px;
+  }
+  .login-brand-mark {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .login-feature {
+    text-align: left;
+  }
+}
+
+@media (max-width: 560px) {
+  /* The circle itself already shrinks fluidly (see the base clamp() rule) -- this just gives
+     the form a little more breathing room from the curve once the circle's gotten small. */
+  .login-circle {
+    padding: 20px;
+  }
+  .login-circle-inner {
+    max-width: 240px;
+  }
+}
+
+@media (max-width: 400px) {
+  /* A true circle can't fit a form + copy at very small widths without either the text
+     kissing the curved edge or the circle ballooning past the viewport — past this point
+     it becomes a normal rounded card instead. */
+  .login-circle-wrap::before {
+    display: none;
+  }
+  .login-circle {
+    border-radius: var(--radius-lg);
+    width: 100%;
+    height: auto;
+    aspect-ratio: auto;
+    padding: 32px 24px;
+  }
+  .login-circle-inner {
+    max-width: 100%;
+  }
+}
+
+/* A quiet corner watermark rather than a banner in the page flow -- fixed positioning keeps
+   it from ever affecting where the circle centers, regardless of viewport height. */
+.login-credits {
+  position: fixed;
+  z-index: 2;
+  right: 18px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  animation: loginFadeUp 700ms cubic-bezier(0.16, 1, 0.3, 1) 400ms both;
+}
+
+.login-credit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 11.5px;
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+a.login-credit-badge:hover {
+  color: #5eead4;
+  text-decoration: none;
+}
+
+.login-credit-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5eead4;
+  opacity: 0.85;
+}
+
+.login-credit-badge strong {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+a.login-credit-badge:hover strong {
+  color: #5eead4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-credits {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Scroll-reveal (Reveal.jsx) — used throughout the landing page           */
+/* ---------------------------------------------------------------------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), transform 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Landing page                                                            */
+/* ---------------------------------------------------------------------- */
+
+.landing-page {
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  /* Room for the fixed nav below, since it's out of normal flow. */
+  padding-top: 64px;
+}
+
+.landing-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Nav — fixed (not sticky): with overflow-x:hidden set above and no explicit overflow-y,
+   browsers treat overflow-y as auto per spec, which turns .landing-page into its own
+   scroll container and breaks position:sticky on a descendant. Fixed sidesteps that. */
+.landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  background: rgba(10, 26, 48, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-nav-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* Anchor targets land below the fixed nav instead of tucked underneath it. */
+.landing-hero,
+.landing-section {
+  scroll-margin-top: 80px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.landing-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.landing-nav-brand-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.18);
+}
+
+.landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.landing-nav-links a {
+  color: #b7c3da;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.landing-nav-links a:hover {
+  color: white;
+  text-decoration: none;
+}
+
+.landing-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 20px -8px rgba(20, 184, 166, 0.6);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.landing-nav-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px -8px rgba(20, 184, 166, 0.75);
+  color: white;
+  text-decoration: none;
+}
+
+/* Hero — same dark/blob/grid visual language as the login page, for continuity */
+
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(64px, 10vw, 120px) 24px clamp(80px, 12vw, 140px);
+  background: radial-gradient(ellipse at top, #0f2a4d 0%, var(--sidebar-bg) 45%, var(--sidebar-bg-alt) 100%);
+}
+
+.landing-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: linear-gradient(rgba(148, 197, 216, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 197, 216, 0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, black 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, black 0%, transparent 78%);
+  pointer-events: none;
+}
+
+.landing-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 780px;
+  margin: 0 auto;
+  text-align: center;
+  color: #e7ecf6;
+}
+
+.landing-hero-inner h1 {
+  font-size: clamp(32px, 4vw + 14px, 56px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+}
+
+.landing-hero-inner h1 span {
+  background: linear-gradient(90deg, #5eead4, #60a5fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-hero-desc {
+  font-size: clamp(15px, 0.6vw + 13px, 18px);
+  line-height: 1.65;
+  color: #b7c3da;
+  max-width: 620px;
+  margin: 0 auto 36px;
+}
+
+.landing-hero-ctas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.landing-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 14px 32px -10px rgba(20, 184, 166, 0.65);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.landing-btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px -10px rgba(20, 184, 166, 0.8);
+  color: white;
+  text-decoration: none;
+}
+
+.landing-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e7ecf6;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.landing-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-3px);
+  color: #e7ecf6;
+  text-decoration: none;
+}
+
+.landing-hero-trust {
+  font-size: 12.5px;
+  color: #7f8fac;
+}
+
+.landing-hero-trust strong {
+  color: #a9dcd4;
+  font-weight: 700;
+}
+
+/* Sections */
+
+.landing-section {
+  padding: clamp(56px, 8vw, 96px) 24px;
+}
+
+.landing-section-alt {
+  background: var(--surface);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.landing-section-header {
+  max-width: 640px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+
+.landing-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.landing-section-header h2 {
+  font-size: clamp(24px, 2vw + 16px, 34px);
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.landing-section-header p {
+  color: var(--text-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Feature cards */
+
+.landing-grid {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: stretch;
+  gap: 20px;
+}
+
+/* Grid stretch only affects the direct grid item (the Reveal wrapper) -- without this, the
+   card inside stays sized to its own content, so cards with shorter copy end up visibly
+   shorter than their row-mates instead of all lining up. */
+.landing-grid > .reveal {
+  display: flex;
+}
+
+.landing-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.landing-section-alt .landing-card {
+  background: var(--surface);
+}
+
+.landing-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.landing-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.landing-card h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.landing-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.landing-card-badge {
+  align-self: flex-start;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+/* Highlight banners (AI + customization) -- deliberately louder than the plain feature grid,
+   since these are the two points meant to actually sell the product, not just describe it. */
+.landing-highlights {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: stretch;
+  gap: 24px;
+}
+
+/* Same fix as .landing-grid: grid stretch only reaches the Reveal wrapper, not the card
+   inside it, so without this the two cards end up different heights whenever their copy
+   wraps to a different number of lines. */
+.landing-highlights > .reveal {
+  display: flex;
+}
+
+.landing-highlight-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  color: white;
+  background: linear-gradient(155deg, #0d2748 0%, #0a1f38 100%);
+  box-shadow: var(--shadow-md);
+}
+
+.landing-highlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 15%, rgba(94, 234, 212, 0.25), transparent 55%);
+  pointer-events: none;
+}
+
+.landing-highlight-badge {
+  position: relative;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5eead4;
+  background: rgba(94, 234, 212, 0.14);
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.landing-highlight-card h3 {
+  position: relative;
+  font-size: 22px;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.landing-highlight-card > p {
+  position: relative;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #b7c3da;
+  margin: 0 0 20px;
+}
+
+.landing-highlight-list {
+  position: relative;
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.landing-highlight-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #d6dfef;
+}
+
+.landing-highlight-list li svg {
+  flex-shrink: 0;
+  color: #5eead4;
+  margin-top: 2px;
+}
+
+/* Product showcase — stylized recreations of the real screens (not literal screenshots; see
+   the "Illustrative preview" label on each), framed like a browser window for a believable
+   "here's the actual product" feel on the marketing page. */
+
+.landing-showcase {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.landing-mockup {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-md);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.landing-mockup:hover {
+  transform: translateY(-5px);
+}
+
+.landing-mockup-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  background: #e2e0d5;
+  border-bottom: 1px solid var(--border-card);
+}
+
+.landing-mockup-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c9c4b3;
+}
+
+.landing-mockup-screen {
+  display: flex;
+  height: 190px;
+  background: var(--bg);
+  font-size: 10px;
+}
+
+.landing-mockup-nav {
+  width: 34px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #0d2748, #0a2038);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.landing-mockup-nav span {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.landing-mockup-nav span.active {
+  background: var(--primary);
+}
+
+.landing-mockup-main {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.landing-mockup-stats {
+  display: flex;
+  gap: 6px;
+}
+
+.landing-mockup-stat {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.landing-mockup-stat b {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.landing-mockup-stat span {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.landing-mockup-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.landing-mockup-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.landing-mockup-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #60a5fa);
+  border-radius: 4px;
+}
+
+.landing-mockup-drop {
+  border: 1.5px dashed var(--border-card);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 9px;
+  background: var(--surface);
+}
+
+.landing-mockup-table {
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 9px;
+}
+
+.landing-mockup-table-row {
+  display: flex;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+  gap: 6px;
+}
+
+.landing-mockup-table-row:last-child {
+  border-bottom: none;
+}
+
+.landing-mockup-table-row.head {
+  background: var(--bg);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.landing-mockup-table-row span:first-child {
+  flex: 1.3;
+  color: var(--text);
+}
+
+.landing-mockup-table-row span {
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.landing-mockup-table-row span.flag {
+  background: #fff3e0;
+  border-radius: 3px;
+  padding: 0 3px;
+  color: #9a5b00;
+  font-weight: 700;
+}
+
+.landing-mockup-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.landing-mockup-tracker-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--primary);
+  flex-shrink: 0;
+}
+
+.landing-mockup-tracker-dot.pending {
+  background: var(--surface);
+  border-color: var(--border-card);
+}
+
+.landing-mockup-tracker-line {
+  flex: 1;
+  height: 2px;
+  background: var(--primary);
+}
+
+.landing-mockup-tracker-line.pending {
+  background: var(--border-soft);
+}
+
+.landing-mockup-caption {
+  padding: 14px 16px 16px;
+}
+
+.landing-mockup-caption h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.landing-mockup-caption p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.landing-mockup-illustrative {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 8px;
+}
+
+/* How it works — a horizontal version of the login page's connector-line motif */
+
+.landing-steps {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  position: relative;
+}
+
+.landing-steps::before {
+  content: "";
+  position: absolute;
+  top: 27px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), #60a5fa, var(--primary));
+  opacity: 0.35;
+}
+
+.landing-step {
+  position: relative;
+  text-align: center;
+  padding: 0 10px;
+}
+
+.landing-step-number {
+  position: relative;
+  z-index: 1;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--primary);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.landing-step h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.landing-step p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* Powered-by strip */
+
+.landing-powered {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.landing-powered-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px 12px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.landing-powered-badge:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.landing-powered-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.landing-powered-logo-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.landing-powered p {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+  margin: 20px 0 0;
+}
+
+/* Contact */
+
+.landing-contact-grid {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+.landing-contact-info h3 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+
+.landing-contact-info p {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+  margin: 0 0 24px;
+}
+
+.landing-contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.landing-contact-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.landing-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Footer */
+
+.landing-footer {
+  background: var(--sidebar-bg);
+  color: #97a5c0;
+  padding: 40px 24px 28px;
+}
+
+.landing-footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 20px;
+}
+
+.landing-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.landing-footer-links {
+  display: flex;
+  gap: 22px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.landing-footer-links a {
+  color: #97a5c0;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.landing-footer-links a:hover {
+  color: white;
+  text-decoration: none;
+}
+
+.landing-footer-bottom {
+  max-width: 1180px;
+  margin: 0 auto;
+  font-size: 12px;
+  color: #6b7a97;
+}
+
+.landing-footer-legal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.landing-footer-legal a {
+  color: #97a5c0;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.landing-footer-legal a:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Legal pages (Terms, Privacy)                                            */
+/* ---------------------------------------------------------------------- */
+
+.legal-page {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.legal-container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.legal-container h1 {
+  font-size: clamp(26px, 3vw + 12px, 34px);
+  margin: 0 0 6px;
+}
+
+.legal-updated {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 36px;
+}
+
+.legal-container h2 {
+  font-size: 18px;
+  margin: 36px 0 12px;
+  letter-spacing: -0.01em;
+}
+
+.legal-container h2:first-of-type {
+  margin-top: 0;
+}
+
+.legal-container p {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+.legal-container ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.legal-container li {
+  font-size: 14.5px;
+  line-height: 1.75;
+  margin-bottom: 6px;
+}
+
+.legal-notice {
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--primary-dark);
+  margin: 0 0 32px;
+}
+
+@media (max-width: 900px) {
+  .landing-nav-links {
+    display: none;
+  }
+  .landing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .landing-steps {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 32px;
+  }
+  .landing-steps::before {
+    display: none;
+  }
+  .landing-contact-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-highlights {
+    grid-template-columns: 1fr;
+  }
+  .landing-showcase {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .landing-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-steps {
+    grid-template-columns: 1fr;
+  }
+}
