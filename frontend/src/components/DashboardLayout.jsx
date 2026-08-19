@@ -5,6 +5,7 @@ import { useUserProfile } from "../context/UserProfileContext";
 import { ComplianceBanner } from "./ComplianceBanner";
 import { AccountIcon } from "./AccountIcon";
 import { BackButton } from "./BackButton";
+import { NotificationBell } from "./NotificationBell";
 import {
   DashboardIcon,
   ClientsIcon,
@@ -118,6 +119,7 @@ export function DashboardLayout() {
             <BackButton />
           </div>
           <div className="topbar-user">
+            <NotificationBell />
             <Link to="/profile" className="topbar-account-link" title="My profile & settings">
               <AccountIcon size={24} />
               <span>
