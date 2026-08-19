@@ -123,6 +123,44 @@ export function FolderIcon(props) {
   );
 }
 
+export function PlusIcon(props) {
+  return (
+    <Icon {...props}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </Icon>
+  );
+}
+
+export function XIcon(props) {
+  return (
+    <Icon {...props}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </Icon>
+  );
+}
+
+export function BellIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </Icon>
+  );
+}
+
 export function BuildingIcon(props) {
   return (
     <Icon {...props}>

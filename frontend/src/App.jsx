@@ -25,6 +25,7 @@ import { SettingsExtractorPage } from "./pages/SettingsExtractorPage";
 import { ExtractorPage } from "./pages/ExtractorPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { DocumentChecklistPage } from "./pages/DocumentChecklistPage";
+import { AttendancePage } from "./pages/AttendancePage";
 
 export default function App() {
   return (
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/extractor" element={<ExtractorPage />} />
+        <Route path="/attendance" element={<AttendancePage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
         <Route path="/clients/:clientId/gst" element={<GstWorkspacePage />} />

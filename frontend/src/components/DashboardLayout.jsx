@@ -15,6 +15,7 @@ import {
   FolderIcon,
   ScanIcon,
   CatalogIcon,
+  CalendarIcon,
   LogoutIcon,
   MenuIcon,
   CloseIcon,
@@ -65,6 +66,7 @@ export function DashboardLayout() {
           <SidebarLink to="/dashboard" icon={<DashboardIcon />} label="Dashboard" onNavigate={closeSidebar} />
           <SidebarLink to="/clients" icon={<ClientsIcon />} label="Clients" onNavigate={closeSidebar} />
           <SidebarLink to="/extractor" icon={<ScanIcon />} label="Extractor" onNavigate={closeSidebar} />
+          <SidebarLink to="/attendance" icon={<CalendarIcon />} label="Attendance" onNavigate={closeSidebar} />
           {isAdmin && (
             <SidebarLink to="/reports" icon={<ReportsIcon />} label="Reports & Analytics" onNavigate={closeSidebar} />
           )}
