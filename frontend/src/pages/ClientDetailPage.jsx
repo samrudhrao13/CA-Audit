@@ -630,7 +630,7 @@ export function ClientDetailPage() {
         </ul>
       </div>
 
-      <HandscribeExtract clientId={client.id} isAdmin={isAdmin} />
+      {!isAdmin && <HandscribeExtract clientId={client.id} />}
 
       {isAdmin && <CompanyDocumentsUpload clientId={client.id} />}
 

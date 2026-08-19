@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { HandscribeLogo } from "./HandscribeLogo";
 import { ExtractionGrid } from "./ExtractionGrid";
@@ -14,7 +13,7 @@ const MAX_FILES = 50;
 /** Client-wise document extraction via HandScribe (OCR + LLM structuring) — see handscribe/README.md.
  *  Templates are maintained by the company admin under Settings → Extractor; this component only
  *  picks from what already exists. */
-export function HandscribeExtract({ clientId, isAdmin }) {
+export function HandscribeExtract({ clientId }) {
   const [templates, setTemplates] = useState(null);
   const [templatesError, setTemplatesError] = useState(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -320,13 +319,7 @@ export function HandscribeExtract({ clientId, isAdmin }) {
 
         {templates.length === 0 && (
           <p className="muted" style={{ margin: 0 }}>
-            No templates yet —{" "}
-            {isAdmin ? (
-              <Link to="/settings/extractor">add one under Settings → Extractor</Link>
-            ) : (
-              "ask your company admin to add one under Settings → Extractor"
-            )}
-            .
+            No templates yet — ask your company admin to add one under Settings → Extractor.
           </p>
         )}
 
