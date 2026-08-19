@@ -1,13 +1,36 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { useUserProfile } from "../context/UserProfileContext";
 import { CredentialForm } from "../components/gst/CredentialForm";
 import { RunPanel } from "../components/gst/RunPanel";
 import { Reconciliation } from "../components/gst/Reconciliation";
 import { ProgressBar } from "../components/ProgressBar";
+import { WorkflowAdminOverview } from "../components/WorkflowAdminOverview";
 
+/** Admins oversee GST work rather than run it -- see WorkflowAdminOverview for what every
+ *  workflow's workspace page shows them instead of the full company-user view below. */
 export function GstWorkspacePage() {
   const { clientId } = useParams();
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === "COMPANY_ADMIN";
+
+  if (isAdmin) {
+    return (
+      <WorkflowAdminOverview
+        clientId={clientId}
+        workflowKey="GST"
+        workflowLabel="GST"
+        identifierLabel="GSTIN"
+        identifierField="gstin"
+      />
+    );
+  }
+
+  return <GstCompanyWorkspace clientId={clientId} />;
+}
+
+function GstCompanyWorkspace({ clientId }) {
   const [client, setClient] = useState(null);
   const [hasCredential, setHasCredential] = useState(false);
   const [periods, setPeriods] = useState([]);
