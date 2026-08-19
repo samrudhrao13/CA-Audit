@@ -1,9 +1,25 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { STAGE_LABELS } from "../lib/progressStages";
+import { STAGE_LABELS, PROGRESS_STAGES } from "../lib/progressStages";
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
+import { BarList } from "../components/charts/BarList";
+import { CATEGORICAL, STAGE_RAMP, NOT_STARTED_COLOR } from "../components/charts/chartPalette";
+
+function ChartCard({ title, subtitle, children }) {
+  return (
+    <div className="card" style={{ flex: "1 1 320px" }}>
+      <p style={{ margin: 0, fontWeight: 600 }}>{title}</p>
+      {subtitle && (
+        <p className="muted" style={{ margin: "2px 0 16px", fontSize: 12 }}>
+          {subtitle}
+        </p>
+      )}
+      <div style={{ marginTop: subtitle ? 0 : 16 }}>{children}</div>
+    </div>
+  );
+}
 
 function KpiCard({ label, count }) {
   return (
@@ -39,6 +55,56 @@ export function ReportsPage() {
     count: report.clients.filter((c) => c.enrolledWorkflows.includes(wf.key)).length,
   }));
 
+  // Nominal identity (which workflow) -- fixed categorical order, one color per workflow,
+  // stable regardless of how many clients are enrolled.
+  const workflowChartData = workflowCounts.map((wf, i) => ({
+    key: wf.key,
+    label: wf.name,
+    value: wf.count,
+    color: CATEGORICAL[i % CATEGORICAL.length],
+  }));
+
+  // Ordinal (where clients stand) -- every enrolled workflow across every client, tallied by
+  // stage. "Not started" is absence, not the lightest step of the progress ramp, so it gets
+  // its own neutral rather than stretching the hue to a 6th step.
+  const stageCounts = {};
+  for (const client of report.clients) {
+    for (const wfKey of client.enrolledWorkflows) {
+      const stage = client.progress[wfKey]?.stage || "not_started";
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    }
+  }
+  const stageChartData = [
+    { key: "not_started", label: STAGE_LABELS.not_started, value: stageCounts.not_started || 0, color: NOT_STARTED_COLOR },
+    ...PROGRESS_STAGES.map((stage, i) => ({
+      key: stage,
+      label: STAGE_LABELS[stage],
+      value: stageCounts[stage] || 0,
+      color: STAGE_RAMP[i],
+    })),
+  ];
+
+  // Magnitude comparison across team members -- one measure, one hue; "Unassigned" gets a
+  // neutral instead of the accent since it isn't really an assignee.
+  const workloadByName = new Map();
+  let unassignedCount = 0;
+  for (const client of report.clients) {
+    if (client.assignedTo.length === 0) {
+      unassignedCount++;
+    } else {
+      for (const name of client.assignedTo) {
+        workloadByName.set(name, (workloadByName.get(name) || 0) + 1);
+      }
+    }
+  }
+  const workloadEntries = [...workloadByName.entries()].map(([name, count]) => ({ key: name, label: name, value: count }));
+  if (unassignedCount > 0) {
+    workloadEntries.push({ key: "__unassigned", label: "Unassigned", value: unassignedCount });
+  }
+  const workloadChartData = workloadEntries
+    .sort((a, b) => b.value - a.value)
+    .map((d) => ({ ...d, color: d.key === "__unassigned" ? NOT_STARTED_COLOR : "var(--primary)" }));
+
   return (
     <div className="stack">
       <div>
@@ -52,6 +118,20 @@ export function ReportsPage() {
           {workflowCounts.map((wf) => (
             <KpiCard key={wf.key} label={`${wf.name} enabled`} count={wf.count} />
           ))}
+        </div>
+      )}
+
+      {report.clients.length > 0 && (
+        <div className="row" style={{ gap: 12, alignItems: "stretch" }}>
+          <ChartCard title="Clients by workflow" subtitle="How many clients are enrolled in each workflow">
+            <BarList data={workflowChartData} />
+          </ChartCard>
+          <ChartCard title="Where clients stand" subtitle={`Every enrolled workflow, by stage — ${report.period}`}>
+            <BarList data={stageChartData} />
+          </ChartCard>
+          <ChartCard title="Client workload" subtitle="Clients assigned per team member">
+            <BarList data={workloadChartData} emptyText="No clients assigned yet." />
+          </ChartCard>
         </div>
       )}
 
