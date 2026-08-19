@@ -1,12 +1,35 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { useUserProfile } from "../context/UserProfileContext";
 import { CredentialForm } from "../components/tds/CredentialForm";
 import { RunPanel } from "../components/tds/RunPanel";
 import { ProgressBar } from "../components/ProgressBar";
+import { WorkflowAdminOverview } from "../components/WorkflowAdminOverview";
 
+/** Admins oversee TDS work rather than run it -- see WorkflowAdminOverview for what every
+ *  workflow's workspace page shows them instead of the full company-user view below. */
 export function TdsWorkspacePage() {
   const { clientId } = useParams();
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === "COMPANY_ADMIN";
+
+  if (isAdmin) {
+    return (
+      <WorkflowAdminOverview
+        clientId={clientId}
+        workflowKey="TDS"
+        workflowLabel="TDS"
+        identifierLabel="TAN"
+        identifierField="tan"
+      />
+    );
+  }
+
+  return <TdsCompanyWorkspace clientId={clientId} />;
+}
+
+function TdsCompanyWorkspace({ clientId }) {
   const [client, setClient] = useState(null);
   const [hasCredential, setHasCredential] = useState(false);
   const [periods, setPeriods] = useState([]);
