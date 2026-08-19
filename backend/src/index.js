@@ -18,6 +18,8 @@ import { invoicesRouter } from "./routes/invoices.js";
 import { companyDocumentsRouter } from "./routes/companyDocuments.js";
 import { handscribeRouter, handscribeTemplatesRouter, handscribeGeneralRouter } from "./routes/handscribe.js";
 import { convertRouter } from "./routes/convert.js";
+import { attendanceRouter } from "./routes/attendance.js";
+import { notificationsRouter } from "./routes/notifications.js";
 import { startScheduler } from "./lib/scheduler.js";
 
 const app = express();
@@ -46,6 +48,8 @@ app.use("/api/handscribe/templates", handscribeTemplatesRouter);
 app.use("/api/handscribe", handscribeGeneralRouter);
 app.use("/api/clients/:clientId/handscribe", handscribeRouter);
 app.use("/api/convert", convertRouter);
+app.use("/api/attendance", attendanceRouter);
+app.use("/api/notifications", notificationsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
