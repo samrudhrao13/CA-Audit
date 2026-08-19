@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { usePagination } from "../hooks/usePagination";
 import { Pagination } from "../components/Pagination";
 
 export function SettingsTeamPage() {
+  const { user } = useAuth();
   const [members, setMembers] = useState(null);
   const [name, setName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
+  const [removingUid, setRemovingUid] = useState(null);
+  const [removeError, setRemoveError] = useState(null);
   const { pageItems: pagedMembers, page, setPage, totalPages } = usePagination(members || []);
 
   async function load() {
@@ -36,6 +40,22 @@ export function SettingsTeamPage() {
       setError(err.message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleRemove(member) {
+    if (!confirm(`Remove ${member.name}? They'll no longer be able to log in, but their name stays on past assignments and uploads.`)) {
+      return;
+    }
+    setRemovingUid(member.uid);
+    setRemoveError(null);
+    try {
+      await api.delete(`/api/team/users/${member.uid}`);
+      await load();
+    } catch (err) {
+      setRemoveError(err.message);
+    } finally {
+      setRemovingUid(null);
     }
   }
 
@@ -78,19 +98,41 @@ export function SettingsTeamPage() {
 
       <div>
         <h2>Members</h2>
+        {removeError && <p className="error-text">{removeError}</p>}
         {members === null ? (
           <p>Loading...</p>
         ) : (
           <>
             <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {pagedMembers.map((m) => (
-                <li key={m.uid} className="card list-item-row">
-                  <span>
-                    {m.name} <span className="muted">({m.userId})</span>
-                  </span>
-                  <span className="muted">{m.role === "COMPANY_ADMIN" ? "Admin" : "User"}</span>
-                </li>
-              ))}
+              {pagedMembers.map((m) => {
+                const removed = m.status === "removed";
+                return (
+                  <li key={m.uid} className="card list-item-row" style={removed ? { opacity: 0.6 } : undefined}>
+                    <span>
+                      {m.name} <span className="muted">({m.userId})</span>
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span className="muted">{m.role === "COMPANY_ADMIN" ? "Admin" : "User"}</span>
+                      {removed ? (
+                        <span className="muted">Removed</span>
+                      ) : (
+                        m.role === "COMPANY_USER" &&
+                        m.uid !== user?.uid && (
+                          <button
+                            type="button"
+                            className="secondary"
+                            style={{ padding: "4px 10px", fontSize: 12 }}
+                            disabled={removingUid === m.uid}
+                            onClick={() => handleRemove(m)}
+                          >
+                            {removingUid === m.uid ? "Removing..." : "Remove"}
+                          </button>
+                        )
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </>

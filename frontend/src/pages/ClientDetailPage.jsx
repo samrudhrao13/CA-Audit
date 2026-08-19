@@ -231,7 +231,7 @@ export function ClientDetailPage() {
   if (!client || !notifyPrefs) return <p>Loading...</p>;
 
   // Admins assign work to users, not to themselves/each other.
-  const assignableMembers = members.filter((m) => m.role === "COMPANY_USER");
+  const assignableMembers = members.filter((m) => m.role === "COMPANY_USER" && m.status !== "removed");
 
   const subscribedKeys = new Set(subscriptions.filter((s) => s.status === "active").map((s) => s.workflowKey));
   const enrolledKeys = new Set(client.enrolledWorkflows || []);

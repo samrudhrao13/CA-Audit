@@ -160,7 +160,7 @@ export function ClientsPage() {
 
   const nameByUid = Object.fromEntries(members.map((m) => [m.uid, m.name]));
   // Admins assign work to users, not to themselves/each other — so they're not a valid filter option.
-  const assignableMembers = members.filter((m) => m.role === "COMPANY_USER");
+  const assignableMembers = members.filter((m) => m.role === "COMPANY_USER" && m.status !== "removed");
 
   const filteredClients = (clients || []).filter((client) => {
     if (statusFilter !== "all" && client.status !== statusFilter) return false;
